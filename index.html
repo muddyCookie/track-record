@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Track Record</title>
+    <meta name="description" content="Track roller coaster rides, manage credits, and discover attractions at theme parks.">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            900: '#14532d',
+                        },
+                        darkbg: '#0f172a',
+                        cardbg: '#1e293b',
+                        bordercolor: '#334155'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Custom scrollbar for dark theme */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        .dashboard-stat-card.is-active {
+            background: linear-gradient(135deg, rgba(var(--active-accent), 0.24), rgba(30, 41, 59, 0.94)) !important;
+            border-color: rgba(var(--active-accent), 0.7) !important;
+            box-shadow: 0 10px 24px rgba(var(--active-accent), 0.12);
+        }
+    </style>
+</head>
+<body class="bg-darkbg text-slate-100 min-h-screen flex flex-col selection:bg-brand-500 selection:text-white">
+
+    <!-- Toast Notification Overlay -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <div id="auth-screen" class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/95 p-4">
+        <form id="auth-form" onsubmit="submitAuthForm(event)" class="w-full max-w-md rounded-2xl border border-bordercolor bg-cardbg p-6 shadow-2xl">
+            <div class="mb-6 flex items-center gap-3">
+                <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 text-white shadow-md shadow-brand-500/20">
+                    <svg viewBox="0 0 24 24" class="h-7 w-7" fill="none" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9.25" stroke="currentColor" stroke-width="1.5"/>
+                        <circle cx="12" cy="12" r="7.1" stroke="currentColor" stroke-opacity=".65" stroke-width="1"/>
+                        <circle cx="12" cy="12" r="5.25" stroke="currentColor" stroke-opacity=".45" stroke-width=".8"/>
+                        <path d="M3.2 13.9c2.7 0 3.1-4.4 5.8-4.4s3.1 4.2 5.7 4.2 3.1-4.1 6.1-4.1" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/>
+                        <path d="M3.6 15.7c2.5 0 3-4.3 5.4-4.3s3.2 4.1 5.7 4.1 3.2-4 5.7-4" stroke="currentColor" stroke-opacity=".75" stroke-width="1.1" stroke-linecap="round"/>
+                        <circle cx="12" cy="12" r="1.15" fill="currentColor"/>
+                    </svg>
+                </span>
+                <div>
+                    <h1 class="text-xl font-bold text-white">Track Record</h1>
+                    <p class="text-xs text-slate-400">Sign in to sync your credits</p>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <label class="block text-xs font-semibold text-slate-300">
+                    Email
+                    <input id="auth-email" type="email" autocomplete="email" required class="mt-1.5 w-full rounded-xl border border-bordercolor bg-slate-900 px-3 py-2.5 text-sm text-slate-100 focus:border-brand-500 focus:outline-none">
+                </label>
+                <label id="auth-password-field" class="block text-xs font-semibold text-slate-300">
+                    Password
+                    <input id="auth-password" type="password" autocomplete="current-password" minlength="6" required class="mt-1.5 w-full rounded-xl border border-bordercolor bg-slate-900 px-3 py-2.5 text-sm text-slate-100 focus:border-brand-500 focus:outline-none">
+                </label>
+                <p id="auth-error" class="hidden rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300" role="alert"></p>
+                <p id="auth-status" class="hidden rounded-lg border border-brand-500/30 bg-brand-500/10 p-3 text-xs text-brand-200" role="status"></p>
+                <button id="auth-retry" type="button" onclick="retryAccountLoad()" class="hidden w-full rounded-xl border border-bordercolor bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Retry loading account</button>
+                <button id="auth-signout" type="button" onclick="signOutAccount()" class="hidden w-full text-xs text-slate-400 hover:text-white">Sign out</button>
+                <button id="auth-submit" type="submit" class="w-full rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-500">Sign in</button>
+                <div class="flex items-center justify-between text-xs">
+                    <button id="auth-mode-toggle" type="button" onclick="toggleAuthMode()" class="text-brand-300 hover:text-brand-200">Create an account</button>
+                    <button id="auth-reset" type="button" onclick="resetAccountPassword()" class="text-slate-400 hover:text-white">Forgot password?</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div id="app-content" class="hidden">
+    <!-- Header Navigation -->
+    <header class="bg-cardbg border-b border-bordercolor sticky top-0 z-40 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex min-h-16 flex-wrap items-center justify-between gap-3 py-2">
+                <!-- Brand -->
+                <button type="button" onclick="goToCredits()" class="flex items-center gap-3 rounded-xl text-left transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-brand-400" title="Track Record - Credits" aria-label="Track Record, go to Credits">
+                    <span class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
+                        <svg viewBox="0 0 24 24" class="h-7 w-7" fill="none" aria-hidden="true">
+                            <circle cx="12" cy="12" r="9.25" stroke="currentColor" stroke-width="1.5"/>
+                            <circle cx="12" cy="12" r="7.1" stroke="currentColor" stroke-opacity=".65" stroke-width="1"/>
+                            <circle cx="12" cy="12" r="5.25" stroke="currentColor" stroke-opacity=".45" stroke-width=".8"/>
+                            <path d="M3.2 13.9c2.7 0 3.1-4.4 5.8-4.4s3.1 4.2 5.7 4.2 3.1-4.1 6.1-4.1" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/>
+                            <path d="M3.6 15.7c2.5 0 3-4.3 5.4-4.3s3.2 4.1 5.7 4.1 3.2-4 5.7-4" stroke="currentColor" stroke-opacity=".75" stroke-width="1.1" stroke-linecap="round"/>
+                            <circle cx="12" cy="12" r="1.15" fill="currentColor"/>
+                        </svg>
+                    </span>
+                    <span class="text-xl font-bold tracking-tight text-white">Track Record</span>
+                </button>
+
+                <!-- Navigation Tabs -->
+                <div class="flex flex-wrap items-center justify-end gap-2">
+                    <span id="account-email" class="hidden max-w-40 truncate px-2 text-xs text-slate-400 sm:inline"></span>
+                    <button type="button" onclick="signOutAccount()" class="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-slate-400 transition hover:bg-slate-800 hover:text-white" title="Sign out">
+                        <i class="fa-solid fa-arrow-right-from-bracket"></i><span class="hidden sm:inline">Sign out</span>
+                    </button>
+                    <button onclick="openSettingsModal()" class="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-150 text-slate-400 hover:text-white hover:bg-slate-800" title="Settings">
+                        <i class="fa-solid fa-gear"></i>
+                        <span>Settings</span>
+                    </button>
+                    <div class="flex space-x-1 bg-slate-900/80 p-1 rounded-xl border border-bordercolor">
+                        <button id="tab-btn-log" onclick="switchTab('log')" class="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-150 bg-brand-600 text-white shadow-sm">
+                            <i class="fa-solid fa-layer-group"></i>
+                            <span>Credits</span>
+                        </button>
+                        <button id="tab-btn-search" onclick="switchTab('search')" class="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-150 text-slate-400 hover:text-white hover:bg-slate-800">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <span>Search Parks</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- TAB 1: LOG & CREDITS DASHBOARD -->
+        <div id="tab-log" class="space-y-6">
+            
+            <!-- Dashboard Top Action Bar -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-cardbg p-4 rounded-2xl border border-bordercolor">
+                <div>
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-chart-pie text-brand-500"></i> Credits
+                    </h2>
+                    <p class="text-xs text-slate-400">Select a category to filter your log; select it again to clear. Totals follow your credit rules.</p>
+                </div>
+            </div>
+
+            <!-- Stats Grid Counters -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+                <!-- Roller -->
+                <button type="button" onclick="applyDashboardFilter('type','Real')" data-filter-kind="type" data-filter-value="Real" style="--active-accent: 16, 185, 129" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-emerald-500/50 transition">
+                    <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Roller</div>
+                    <div id="stat-real" class="text-2xl font-black text-emerald-400">0</div>
+                    <i class="fa-solid fa-drumstick-bite absolute -right-2 -bottom-2 text-4xl text-emerald-500/10 group-hover:text-emerald-500/20 transition"></i>
+                </button>
+
+                <!-- Powered -->
+                <button type="button" onclick="applyDashboardFilter('type','Powered')" data-filter-kind="type" data-filter-value="Powered" style="--active-accent: 251, 191, 36" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-amber-500/50 transition">
+                    <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Powered</div>
+                    <div id="stat-powered" class="text-2xl font-black text-amber-400">0</div>
+                    <i class="fa-solid fa-bolt absolute -right-2 -bottom-2 text-4xl text-amber-500/10 group-hover:text-amber-500/20 transition"></i>
+                </button>
+
+                <!-- Alpine -->
+                <button type="button" onclick="applyDashboardFilter('type','Alpine')" data-filter-kind="type" data-filter-value="Alpine" style="--active-accent: 56, 189, 248" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-sky-500/50 transition">
+                    <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Alpine</div>
+                    <div id="stat-alpine" class="text-2xl font-black text-sky-400">0</div>
+                    <i class="fa-solid fa-mountain absolute -right-2 -bottom-2 text-4xl text-sky-500/10 group-hover:text-sky-500/20 transition"></i>
+                </button>
+
+                <!-- Water -->
+                <button type="button" onclick="applyDashboardFilter('type','Water')" data-filter-kind="type" data-filter-value="Water" style="--active-accent: 34, 211, 238" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-cyan-500/50 transition">
+                    <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Water</div>
+                    <div id="stat-water" class="text-2xl font-black text-cyan-400">0</div>
+                    <i class="fa-solid fa-water absolute -right-2 -bottom-2 text-4xl text-cyan-500/10 group-hover:text-cyan-500/20 transition"></i>
+                </button>
+
+                <!-- Duplicates -->
+                <button type="button" onclick="applyDashboardFilter('variants')" data-filter-kind="variants" style="--active-accent: 192, 132, 252" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-purple-500/50 transition">
+                    <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Duplicates</div>
+                    <div id="stat-duplicates" class="text-2xl font-black text-purple-400">0</div>
+                    <i class="fa-solid fa-copy absolute -right-2 -bottom-2 text-4xl text-purple-500/10 group-hover:text-purple-500/20 transition"></i>
+                </button>
+
+                <!-- Total Calculated Credits -->
+                <button type="button" onclick="applyDashboardFilter('credits')" data-filter-kind="credits" style="--active-accent: 16, 185, 129" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-brand-300 transition">
+                    <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Total Credits</div>
+                    <div id="stat-total" class="text-3xl font-black text-white">0</div>
+                    <i class="fa-solid fa-trophy absolute -right-2 -bottom-2 text-5xl text-brand-500/20 group-hover:text-brand-500/30 transition"></i>
+                </button>
+
+                <!-- Parks Visited -->
+                <button type="button" onclick="toggleParkBreakdown()" data-filter-kind="parks" style="--active-accent: 129, 140, 248" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-indigo-500/50 transition">
+                    <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Parks Visited</div>
+                    <div id="stat-parks" class="text-2xl font-black text-indigo-400">0</div>
+                    <i class="fa-solid fa-map-location-dot absolute -right-2 -bottom-2 text-4xl text-indigo-500/10 group-hover:text-indigo-500/20 transition"></i>
+                </button>
+            </div>
+            <!-- Logbook Header & Search/Filter Controls -->
+            <div class="bg-cardbg rounded-2xl border border-bordercolor p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="w-full md:w-auto flex items-center gap-3">
+                    <h3 class="text-base font-bold text-white whitespace-nowrap flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-slate-400"></i> My Coaster Log
+                    </h3>
+                    <span id="log-count-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-bordercolor">
+                        0 Rides Logged
+                    </span>
+                </div>
+
+                <!-- Filters -->
+                <div class="w-full md:w-auto flex flex-col sm:flex-row items-center gap-2">
+                    <button onclick="openAddModal()" class="w-full sm:w-auto whitespace-nowrap px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand-600 hover:bg-brand-500 text-white flex items-center justify-center gap-1.5 transition">
+                        <i class="fa-solid fa-plus"></i> Add Manual Entry
+                    </button>
+                    <div class="relative w-full sm:w-64">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" id="log-search" oninput="renderLogbook()" placeholder="Search ride or park..." class="w-full bg-slate-900 border border-bordercolor rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500">
+                    </div>
+                    
+
+                    <select id="log-sort" onchange="renderLogbook()" class="w-full sm:w-auto bg-slate-900 border border-bordercolor rounded-xl px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-brand-500">
+                        <option value="date-desc">Newest First</option>
+                        <option value="date-asc">Oldest First</option>
+                        <option value="name-asc">Coaster Name A-Z</option>
+                        <option value="park-asc">Park Name A-Z</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="park-breakdown" class="hidden rounded-2xl border border-bordercolor bg-cardbg p-4"></div>
+
+            <!-- Logbook Entries List -->
+            <div id="log-list" class="space-y-3">
+                <!-- Empty State Initial View -->
+                <div class="bg-cardbg rounded-2xl border border-bordercolor p-12 text-center">
+                    <div class="w-16 h-16 rounded-full bg-slate-800 text-slate-500 flex items-center justify-center mx-auto mb-4 text-2xl">
+                        <i class="fa-solid fa-ghost"></i>
+                    </div>
+                    <h3 class="text-base font-semibold text-white mb-1">Your Coaster Log is Empty</h3>
+                    <p class="text-xs text-slate-400 max-w-md mx-auto mb-6">Start building your credit list by searching for theme parks or manually adding rides you've ridden!</p>
+                    <div class="flex justify-center gap-3">
+                        <button onclick="switchTab('search')" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-brand-600/20 transition">
+                            <i class="fa-solid fa-magnifying-glass mr-1.5"></i> Search Parks
+                        </button>
+                        <button onclick="openAddModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-bordercolor rounded-xl text-xs font-semibold transition">
+                            <i class="fa-solid fa-plus mr-1.5"></i> Add Custom Entry
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: SEARCH & ADD COASTERPEDIA COASTERS -->
+        <div id="tab-search" class="hidden space-y-6">
+            
+            <div class="bg-cardbg rounded-2xl border border-bordercolor p-6 space-y-4">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-globe text-brand-500"></i> Coasterpedia Coaster Discovery
+                        </h2>
+                        <p class="text-xs text-slate-400">Browse or search all Coasterpedia parks that list present or former coasters</p>
+                    </div>
+                </div>
+
+                <p class="text-[11px] text-slate-500">Park coaster lists are provided by <a href="https://coasterpedia.net/" target="_blank" rel="noopener noreferrer" class="text-brand-400 hover:text-brand-300 underline">Coasterpedia</a>. For standalone coasters not listed here, use "Add Manual Entry" in Credits.</p>
+
+                <div class="relative">
+                    <label for="park-search-input" class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Search parks</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="search" id="park-search-input" oninput="searchCoasterpedia()" onfocus="showParkSearchResults()" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="park-search-results" aria-expanded="false" placeholder="Browse all parks or search by name..." class="w-full bg-slate-900 border border-bordercolor rounded-xl pl-8 pr-3 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div id="park-search-results" role="listbox" onscroll="onParkSearchScroll()" class="hidden absolute left-0 right-0 top-full mt-1 z-30 max-h-72 overflow-y-auto bg-slate-900 border border-bordercolor rounded-xl shadow-xl"></div>
+                </div>
+            </div>
+
+            <!-- Rides Directory Results Container -->
+            <div id="rides-results-container" class="bg-cardbg rounded-2xl border border-bordercolor p-6 min-h-[300px]">
+                <div id="rides-results-placeholder" class="text-center py-12">
+                    <i class="fa-solid fa-location-dot text-4xl text-slate-600 mb-3 block"></i>
+                    <h4 class="text-sm font-semibold text-slate-300">No Park Selected</h4>
+                    <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1">Search for a park above to browse present and former coasters.</p>
+                </div>
+
+                <div id="rides-loading" class="hidden text-center py-12">
+                    <i class="fa-solid fa-circle-notch fa-spin text-3xl text-brand-500 mb-3 block"></i>
+                    <p class="text-xs text-slate-400 font-medium">Fetching coaster directory from Coasterpedia...</p>
+                </div>
+
+                <div id="rides-content" class="hidden space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-bordercolor pb-4">
+                        <div>
+                            <h3 id="current-park-title" class="text-base font-bold text-white">Park Attractions</h3>
+                            <p id="current-park-sub" class="text-xs text-slate-400">Browse present and former coasters, including earlier names of reimagined rides</p>
+                        </div>
+                        <input type="text" id="ride-search-filter" oninput="filterRidesList()" placeholder="Filter rides in this park..." class="bg-slate-900 border border-bordercolor rounded-xl px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500 w-full sm:w-64">
+                    </div>
+
+                    <div id="rides-grid" class="space-y-4">
+                        <!-- Coaster list populated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+    </div>
+
+    <!-- MODAL 1: EDIT / ADD RIDE ENTRY -->
+    <div id="modal-entry" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-cardbg border border-bordercolor w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-6 py-4 border-b border-bordercolor flex items-center justify-between bg-slate-900/50">
+                <h3 id="modal-entry-title" class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square text-brand-500"></i> Add Log Entry
+                </h3>
+                <button onclick="closeEntryModal()" class="text-slate-400 hover:text-white transition text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="entry-form" onsubmit="saveEntry(event)" class="p-6 overflow-y-auto space-y-4 text-xs">
+                <input type="hidden" id="form-entry-id">
+                <input type="hidden" id="form-ride-status" value="Unknown">
+
+                <!-- Park Names Row -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Park Name <span class="text-slate-500 font-normal">(Optional for standalone rides)</span></label>
+                        <input type="text" id="form-park-name" placeholder="e.g. Kings Island (leave blank for a standalone ride)" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-400 mb-1">Park Name WHEN RIDDEN <span class="text-slate-500 font-normal">(Historic)</span></label>
+                        <input type="text" id="form-park-ridden" placeholder="e.g. Paramount's Kings Island" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                    </div>
+                </div>
+
+                <!-- Coaster Names Row -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Official Coaster Name *</label>
+                        <input type="text" id="form-coaster-name" required placeholder="e.g. Top Thrill 2" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-400 mb-1">Coaster Name WHEN RIDDEN <span class="text-slate-500 font-normal">(Historic)</span></label>
+                        <input type="text" id="form-coaster-ridden" placeholder="e.g. Top Thrill Dragster" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                    </div>
+                </div>
+
+                <!-- Classification Row -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Ride Type *</label>
+                        <select id="form-coaster-type" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                            <option value="Real">Roller Coaster</option>
+                            <option value="Powered">Powered Coaster</option>
+                            <option value="Alpine">Alpine Coaster</option>
+                            <option value="Water">Water Coaster</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Ride Version / Variation *</label>
+                        <select id="form-variant-type" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                            <option value="Original">Original</option>
+                            <option value="ExperienceChange">Same Track, Different Experience</option>
+                            <option value="ElementChange">Track / Element Change</option>
+                            <option value="Relocated">Relocated</option>
+                        </select>
+                        <p class="mt-1 text-[10px] text-slate-500">Present/former status follows Coasterpedia's current park list. For a relocated ride with changed track or elements, choose Track / Element Change.</p>
+                    </div>
+                </div>
+
+                <!-- Date & Counts -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Date Ridden</label>
+                        <input type="date" id="form-date-ridden" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Time Ridden</label>
+                        <input type="time" id="form-time-ridden" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Ride Count / Laps</label>
+                        <input type="number" id="form-ride-count" min="1" value="1" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                    </div>
+                </div>
+
+                <!-- Notes Field -->
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">Notes / Experience Details</label>
+                    <textarea id="form-notes" rows="2" placeholder="e.g. Front row night ride, launch felt intense!" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 resize-none"></textarea>
+                </div>
+
+                <!-- Submit Buttons -->
+                <div class="pt-2 flex justify-end gap-2 border-t border-bordercolor">
+                    <button type="button" onclick="closeEntryModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold transition">Cancel</button>
+                    <button type="submit" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-semibold shadow-md shadow-brand-600/20 transition">Save Ride Entry</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div id="modal-settings" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-cardbg border border-bordercolor w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-6 py-4 border-b border-bordercolor flex items-center justify-between bg-slate-900/50">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-gear text-brand-500"></i> Settings
+                </h3>
+                <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white transition text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="p-6 space-y-3 text-xs overflow-y-auto">
+                <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Credit Calculation Rules</h4>
+                <p class="text-slate-400 mb-2">Choose which ride types and versions count toward Total Credits. These settings change the total, not which entries appear in your log.</p>
+
+                <h4 class="pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Ride types</h4>
+                <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
+                    <span class="font-medium text-slate-200">Count powered coasters</span>
+                    <input type="checkbox" id="rule-powered" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
+                </label>
+
+                <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
+                    <span class="font-medium text-slate-200">Count alpine coasters</span>
+                    <input type="checkbox" id="rule-alpine" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
+                </label>
+
+                <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
+                    <span class="font-medium text-slate-200">Count water coasters</span>
+                    <input type="checkbox" id="rule-water" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
+                </label>
+
+                <h4 class="pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Ride versions and changes</h4>
+                <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
+                    <span class="font-medium text-slate-200">Count same-track experience changes (VR, enclosure)</span>
+                    <input type="checkbox" id="rule-experience-change" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
+                </label>
+
+                <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
+                    <span class="font-medium text-slate-200">Count track / element changes (rebuild, launch, elements)</span>
+                    <input type="checkbox" id="rule-element-change" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
+                </label>
+
+                <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
+                    <span class="font-medium text-slate-200">Count relocated coasters (no track / element changes)</span>
+                    <input type="checkbox" id="rule-relocated" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
+                </label>
+
+                <h4 class="pt-4 text-[11px] font-bold uppercase tracking-wider text-slate-500">Data</h4>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="exportData('json')" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-bordercolor flex items-center gap-2 transition">
+                        <i class="fa-solid fa-file-export"></i> Export JSON Backup
+                    </button>
+                    <button type="button" onclick="document.getElementById('import-file-input').click()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-bordercolor flex items-center gap-2 transition">
+                        <i class="fa-solid fa-file-import"></i> Import JSON or CSV
+                    </button>
+                    <input type="file" id="import-file-input" class="hidden" accept=".json,.csv" onchange="importData(event)">
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-bordercolor bg-slate-900/50 flex justify-end">
+                <button onclick="closeSettingsModal()" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-semibold text-xs shadow-md shadow-brand-600/20 transition">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="firebase-cloud.js"></script>
+    <script src="app.js" defer></script>
+</body>
+</html>

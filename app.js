@@ -22,8 +22,7 @@
 
         const MINOR_RIDE_NAME_ALIASES = [
             { canonical: 'X2', names: ['X', 'X2'] },
-            { canonical: 'Wilderness Run', names: ['Jr. Gemini', 'Wilderness Run'] },
-            { canonical: 'Iron Dragon', names: ['Iron Dragon', 'Iron Dragon VR'] }
+            { canonical: 'Wilderness Run', names: ['Jr. Gemini', 'Wilderness Run'] }
         ];
 
         // Credit Calculation Rules Defaults
@@ -31,7 +30,6 @@
             powered: true,
             alpine: true,
             water: true,
-            experienceChange: false,
             elementChange: true,
             relocated: true,
             countRelogs: false
@@ -248,7 +246,6 @@
             document.getElementById('rule-powered').checked = creditRules.powered;
             document.getElementById('rule-alpine').checked = creditRules.alpine;
             document.getElementById('rule-water').checked = creditRules.water;
-            document.getElementById('rule-experience-change').checked = creditRules.experienceChange;
             document.getElementById('rule-element-change').checked = creditRules.elementChange;
             document.getElementById('rule-relocated').checked = creditRules.relocated;
             document.getElementById('rule-count-relogs').checked = creditRules.countRelogs;
@@ -364,16 +361,14 @@
         function migrateCreditRules(saved = {}) {
             const oldOverhaul = typeof saved.overhaul === 'boolean' ? saved.overhaul : creditRules.elementChange;
             const oldDrive = typeof saved.drive === 'boolean' ? saved.drive : creditRules.elementChange;
+            const legacyExperienceChange = Boolean(saved.experienceChange || saved.vr || saved.indoor);
             return {
                 powered: typeof saved.powered === 'boolean' ? saved.powered : creditRules.powered,
                 alpine: typeof saved.alpine === 'boolean' ? saved.alpine : creditRules.alpine,
                 water: typeof saved.water === 'boolean' ? saved.water : creditRules.water,
-                experienceChange: typeof saved.experienceChange === 'boolean'
-                    ? saved.experienceChange
-                    : Boolean(saved.vr || saved.indoor),
                 elementChange: typeof saved.elementChange === 'boolean'
-                    ? saved.elementChange
-                    : oldOverhaul || oldDrive,
+                    ? saved.elementChange || legacyExperienceChange
+                    : oldOverhaul || oldDrive || legacyExperienceChange,
                 relocated: typeof saved.relocated === 'boolean' ? saved.relocated : creditRules.relocated,
                 countRelogs: typeof saved.countRelogs === 'boolean' ? saved.countRelogs : false
             };
@@ -381,16 +376,13 @@
 
         function normalizeRideVariant(variant = 'Original') {
             if (!variant) return 'Original';
-            if (variant === 'VR') return 'Original';
-            if (variant === 'Indoor') return 'ExperienceChange';
-            if (['Overhaul', 'DriveChange'].includes(variant)) return 'ElementChange';
+            if (['VR', 'Indoor', 'ExperienceChange', 'Overhaul', 'DriveChange'].includes(variant)) return 'ElementChange';
             if (variant === 'Defunct') return 'Original';
             return variant;
         }
 
         function canonicalRideName(name = '') {
             const normalizedName = name.toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
-            if (normalizedName.endsWith('vr')) return name.replace(/\s*vr$/i, '').trim();
             const alias = MINOR_RIDE_NAME_ALIASES.find(item =>
                 item.names.some(aliasName => aliasName.toLocaleLowerCase().replace(/[^a-z0-9]/g, '') === normalizedName)
             );
@@ -399,7 +391,6 @@
 
         function isMinorRideNameAlias(name = '') {
             const normalizedName = name.toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
-            if (normalizedName.endsWith('vr')) return true;
             return MINOR_RIDE_NAME_ALIASES.some(item =>
                 item.names.some(aliasName => aliasName.toLocaleLowerCase().replace(/[^a-z0-9]/g, '') === normalizedName)
             );
@@ -414,7 +405,6 @@
 
         function rideVariantLabel(variant) {
             const labels = {
-                ExperienceChange: 'Experience Change',
                 ElementChange: 'Reimagined',
                 Relocated: 'Relocated',
                 Defunct: 'Defunct / Retracked',
@@ -534,7 +524,6 @@
                 }
 
                 // Variant exceptions
-                if (variant === 'ExperienceChange' && !creditRules.experienceChange) isCredit = false;
                 if (variant === 'ElementChange' && !creditRules.elementChange) isCredit = false;
                 if (variant === 'Relocated' && !creditRules.relocated) isCredit = false;
                 if (variant === 'ReviewChange') isCredit = false;
@@ -565,7 +554,6 @@
                 (type === 'Alpine' && creditRules.alpine) ||
                 (type === 'Water' && creditRules.water);
 
-            if (variant === 'ExperienceChange' && !creditRules.experienceChange) isCredit = false;
             if (variant === 'ElementChange' && !creditRules.elementChange) isCredit = false;
             if (variant === 'Relocated' && !creditRules.relocated) isCredit = false;
             if (variant === 'ReviewChange') isCredit = false;
@@ -1274,7 +1262,8 @@
                         entityType: `${rideStatus} coaster`,
                         parkName,
                         type: classifyCoasterpediaRide(rideClass),
-                        rideType
+                        rideType,
+                        variant: /\bvr$/i.test(name) ? 'ElementChange' : 'Original'
                     });
                 });
             });
@@ -1485,27 +1474,13 @@
                 );
             });
 
-            currentParkRides.slice().forEach(vrRide => {
-                if (!/vr$/i.test(vrRide.name)) return;
-                const currentName = vrRide.name.replace(/\s*vr$/i, '').trim();
-                const canonicalRide = currentParkRides.find(ride =>
-                    ride.name.toLocaleLowerCase() === currentName.toLocaleLowerCase() &&
-                    ride.entityType === 'Present coaster'
-                );
-                if (!canonicalRide) return;
-                canonicalRide.historicalNames = [...new Set([
-                    ...(canonicalRide.historicalNames || []),
-                    vrRide.name
-                ])];
-                currentParkRides = currentParkRides.filter(ride => ride !== vrRide);
-            });
         }
 
         function isNameOnlyRideChange(currentName, formerName) {
             const normalize = name => name.toLowerCase().replace(/[^a-z0-9]/g, '');
             const current = normalize(currentName);
             const former = normalize(formerName);
-            return current === former || current === `${former}vr` || former === `${current}vr` ||
+            return current === former ||
                 MINOR_RIDE_NAME_ALIASES.some(item => {
                     const names = item.names.map(normalize);
                     return names.includes(current) && names.includes(former);
@@ -1569,36 +1544,52 @@
 
         function classifyCoasterpediaChange(wikitext, infobox, nameHistory) {
             const normalizedText = wikitext.toLocaleLowerCase();
-            const majorSpecFields = ['manufacturer', 'product', 'track_material', 'category1', 'category2', 'lift/launch'];
-            const specificationChange = majorSpecFields.some(field => {
+            const hasHistoricalSpecification = value =>
+                /originally|\b(?:19|20)\d{2}\s*[-–]\s*(?:19|20)\d{2}\b/i.test(value) ||
+                (/<br\s*\/?\s*>/i.test(value) && /\[\[[^\]]+\]\]/.test(value));
+            const trackMaterial = infobox.match(/^\|track_material\s*=\s*(.+)$/im)?.[1] || '';
+            const trackMaterialChange = hasHistoricalSpecification(trackMaterial) &&
+                /\bwood(?:en)?\b/i.test(trackMaterial) && /\bsteel\b/i.test(trackMaterial);
+            const specificationChange = ['category1', 'category2', 'lift/launch'].some(field => {
                 const value = infobox.match(new RegExp(`^\\|${field.replace('/', '\\/')}\\s*=\\s*(.+)$`, 'im'))?.[1] || '';
-                return /originally|\b(?:19|20)\d{2}\s*[-–]\s*(?:19|20)\d{2}\b/i.test(value) ||
-                    (/<br\s*\/?\s*>/i.test(value) && /\[\[[^\]]+\]\]/.test(value));
+                return hasHistoricalSpecification(value);
             });
             if (normalizedText.split(/[.!?\n]/).some(sentence =>
-                isStructuralRideChange(sentence) || isMajorRideTransformation(sentence)
+                isStructuralRideChange(sentence) ||
+                isMajorRideTransformation(sentence) ||
+                isTrackMaterialChange(sentence)
             ) ||
+                trackMaterialChange ||
                 (specificationChange && nameHistory.length > 1)) {
                 return 'reimagined';
             }
-            if (/\b(?:renamed|name changed|new name|repainted|new colour scheme|new color scheme|new trains?|train was replaced|virtual reality overlay|vr overlay)\b/i.test(normalizedText)) {
+            if (/\b(?:renamed|name changed|new name|repainted|new colour scheme|new color scheme|new trains?|train was replaced|rethemed|new theme|theme change|retrack(?:ed|ing|s)?)\b/i.test(normalizedText)) {
                 return 'minor';
             }
             return nameHistory.length > 1 ? 'uncertain' : 'none';
         }
 
         function isStructuralRideChange(sentence) {
-            const structuralNoun = '(?:layout|track|elements?|drop|lift|launch|loop|inversion|course|coaster type)';
-            const changeVerb = '(?:chang(?:e|ed|es|ing)|modif(?:y|ied|ies|ication)|replac(?:e|ed|es|ing)|remov(?:e|ed|es|ing)|add(?:ed|s|ing)|convert(?:ed|s|ing)|retrack(?:ed|s|ing)|reprofil(?:ed|e|ing))';
+            const structuralNoun = '(?:layout|elements?|drop|lift|launch|loop|inversion|course|coaster type)';
+            const changeVerb = '(?:chang(?:e|ed|es|ing)|modif(?:y|ied|ies|ication)|replac(?:e|ed|es|ing)|remov(?:e|ed|es|ing)|add(?:ed|s|ing)|convert(?:ed|s|ing)|reprofil(?:ed|e|ing))';
             return new RegExp(`\\b${structuralNoun}\\b(?:(?!\\bnot\\b)[^.!?\\n]){0,180}\\b${changeVerb}\\b`, 'i').test(sentence) ||
                 new RegExp(`\\b${changeVerb}\\b(?:(?!\\bnot\\b)[^.!?\\n]){0,180}\\b${structuralNoun}\\b`, 'i').test(sentence) ||
                 /\bconverted?\s+(?:from\b.{0,80}\bto\b|into\b.{0,60}\b(?:floorless|stand.?up|sit.?down|inverted|launched|wooden|steel))\b/i.test(sentence);
         }
 
+        function isTrackMaterialChange(sentence) {
+            return /\bwood(?:en)?\b/i.test(sentence) &&
+                /\bsteel\b/i.test(sentence) &&
+                /\b(?:replac(?:ed|ing)|convert(?:ed|ing)|chang(?:ed|ing)|switch(?:ed|ing)|from|to)\b/i.test(sentence);
+        }
+
         function isMajorRideTransformation(sentence) {
-            return /\b(?:completely|fully)\s+enclos(?:ed|ing)\b/i.test(sentence) ||
-                /\b(?:enclos(?:ed|ing)|rethem(?:ed|ing))\b[^.!?\n]{0,100}\b(?:ride|coaster|building|show|theme)\b/i.test(sentence) ||
-                /\b(?:major|complete|extensive)\s+(?:refurbishment|renovation|overhaul|transformation)\b/i.test(sentence);
+            return /\b(?:virtual reality|vr)\s+(?:overlay|experience|conversion|version)\b/i.test(sentence) ||
+                /\b(?:convert(?:ed|s|ing)?|chang(?:ed|es|ing)|mov(?:ed|es|ing))\b[^.!?\n]{0,120}\b(?:indoor|outdoor)\b[^.!?\n]{0,120}\b(?:indoor|outdoor)\b/i.test(sentence) ||
+                /\b(?:convert(?:ed|s|ing)?|chang(?:ed|es|ing)|mov(?:ed|es|ing))\b[^.!?\n]{0,120}\b(?:indoor|outdoor)\b/i.test(sentence) ||
+                /\b(?:completely|fully)\s+enclos(?:ed|ing)\b/i.test(sentence) ||
+                /\b(?:converted|changed)\s+(?:from\s+)?(?:a\s+)?stand.?up\s+(?:coaster|ride)?\s*(?:to|into)\s+(?:a\s+)?floorless\b/i.test(sentence) ||
+                /\b(?:converted|changed)\s+(?:from\s+)?(?:a\s+)?floorless\s+(?:coaster|ride)?\s*(?:to|into)\s+(?:a\s+)?stand.?up\b/i.test(sentence);
         }
 
         function parseCoasterpediaDate(value) {
@@ -2007,7 +1998,6 @@
                 powered: document.getElementById('rule-powered').checked,
                 alpine: document.getElementById('rule-alpine').checked,
                 water: document.getElementById('rule-water').checked,
-                experienceChange: document.getElementById('rule-experience-change').checked,
                 elementChange: document.getElementById('rule-element-change').checked,
                 relocated: document.getElementById('rule-relocated').checked,
                 countRelogs: document.getElementById('rule-count-relogs').checked

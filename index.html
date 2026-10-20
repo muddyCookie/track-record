@@ -53,6 +53,7 @@
             box-shadow: 0 10px 24px rgba(var(--active-accent), 0.12);
         }
         #log-list { overflow-anchor: none; }
+        #startup-screen.hidden { display: none; }
         @media (max-width: 900px) {
             #log-action-controls {
                 width: 100% !important;
@@ -116,6 +117,25 @@
     <!-- Toast Notification Overlay -->
     <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
+    <div id="startup-screen" class="fixed inset-0 z-[55] flex items-center justify-center bg-darkbg p-6">
+        <div class="flex flex-col items-center gap-4 text-center">
+            <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-brand-600 to-emerald-400 text-white shadow-lg shadow-brand-500/20">
+                <svg viewBox="0 0 24 24" class="h-9 w-9" fill="none" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9.25" stroke="currentColor" stroke-width="1.5"/>
+                    <circle cx="12" cy="12" r="7.1" stroke="currentColor" stroke-opacity=".65" stroke-width="1"/>
+                    <circle cx="12" cy="12" r="5.25" stroke="currentColor" stroke-opacity=".45" stroke-width=".8"/>
+                    <path d="M3.2 13.9c2.7 0 3.1-4.4 5.8-4.4s3.1 4.2 5.7 4.2 3.1-4.1 6.1-4.1M3.6 15.7c2.5 0 3-4.3 5.4-4.3s3.2 4.1 5.7 4.1 3.2-4 5.7-4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+                    <circle cx="12" cy="12" r="1.15" fill="currentColor"/>
+                </svg>
+            </span>
+            <div>
+                <p class="font-bold text-white">Track Record</p>
+                <p class="mt-1 text-sm text-slate-400">Loading your account…</p>
+            </div>
+            <i class="fa-solid fa-circle-notch fa-spin text-brand-400" aria-hidden="true"></i>
+        </div>
+    </div>
+
     <div id="auth-screen" class="auth-overlay fixed inset-0 z-[60] hidden bg-slate-950/80 p-4 backdrop-blur-sm" onclick="if (event.target === this) closeAuthDialog()">
         <form id="auth-form" onsubmit="submitAuthForm(event)" class="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-bordercolor bg-cardbg p-6 shadow-2xl">
             <div class="mb-6 flex items-center gap-3">
@@ -146,8 +166,8 @@
                 <p id="auth-error" class="hidden rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300" role="alert"></p>
                 <p id="auth-status" class="hidden rounded-lg border border-brand-500/30 bg-brand-500/10 p-3 text-xs text-brand-200" role="status"></p>
                 <button id="auth-retry" type="button" onclick="retryAccountLoad()" class="hidden w-full rounded-xl border border-bordercolor bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Retry loading account</button>
-                <button id="auth-signout" type="button" onclick="signOutAccount()" class="hidden w-full text-xs text-slate-400 hover:text-white">Sign out</button>
-                <button id="auth-submit" type="submit" class="w-full rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-500">Sign in</button>
+                <button id="auth-signout" type="button" onclick="signOutAccount()" class="hidden w-full text-xs text-slate-400 hover:text-white">Sign Out</button>
+                <button id="auth-submit" type="submit" class="w-full rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-500">Sign In</button>
                 <div class="flex items-center justify-between text-xs">
                     <button id="auth-mode-toggle" type="button" onclick="toggleAuthMode()" class="text-brand-300 hover:text-brand-200">Create an account</button>
                     <button id="auth-reset" type="button" onclick="resetAccountPassword()" class="text-slate-400 hover:text-white">Forgot password?</button>
@@ -157,7 +177,7 @@
         </form>
     </div>
 
-    <div id="app-content">
+    <div id="app-content" class="hidden">
     <!-- Header Navigation -->
     <header class="bg-cardbg border-b border-bordercolor sticky top-0 z-40 shadow-lg">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -535,6 +555,13 @@
                     <span class="font-medium text-slate-200">Count relocated coasters (no track / element changes)</span>
                     <input type="checkbox" id="rule-relocated" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
                 </label>
+
+                <h4 class="pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Repeat rides</h4>
+                <label class="flex items-center justify-between gap-4 p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
+                    <span class="font-medium text-slate-200">Count relogs toward Total</span>
+                    <input type="checkbox" id="rule-count-relogs" onchange="saveRules()" class="w-4 h-4 shrink-0 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
+                </label>
+                <p class="-mt-1 text-[11px] text-slate-500">When off, each coaster counts once even if you log multiple laps. When on, each recorded lap adds to Total.</p>
 
                 <h4 class="pt-4 text-[11px] font-bold uppercase tracking-wider text-slate-500">Data</h4>
                 <div class="flex flex-wrap gap-2">

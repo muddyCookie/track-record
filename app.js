@@ -27,7 +27,8 @@
             water: true,
             experienceChange: false,
             elementChange: true,
-            relocated: true
+            relocated: true,
+            countRelogs: false
         };
         let creditRules = { ...DEFAULT_CREDIT_RULES };
 
@@ -48,6 +49,8 @@
                 });
             } catch (error) {
                 console.error('Firebase initialization failed:', error);
+                document.getElementById('startup-screen').classList.add('hidden');
+                document.getElementById('app-content').classList.remove('hidden');
                 openAuthDialog();
                 showAuthMessage(`Could not connect to Firebase: ${error.message}`, 'error');
             }
@@ -98,6 +101,7 @@
             const emailLabel = document.getElementById('account-email');
 
             if (!user) {
+                document.getElementById('startup-screen').classList.add('hidden');
                 cloudDataSubscription?.();
                 cloudDataSubscription = null;
                 currentUser = null;
@@ -126,7 +130,7 @@
             updateAccountAction();
             cloudDataSubscription?.();
             cloudDataSubscription = null;
-            appContent.classList.remove('hidden');
+            document.getElementById('startup-screen').classList.remove('hidden');
             authScreen.classList.add('hidden');
             document.getElementById('auth-submit').disabled = false;
             document.getElementById('continue-as-guest').classList.remove('hidden');
@@ -163,6 +167,7 @@
                 document.getElementById('auth-signout').classList.add('hidden');
                 authScreen.classList.add('hidden');
                 appContent.classList.remove('hidden');
+                document.getElementById('startup-screen').classList.add('hidden');
                 updateAccountAction();
                 cloudDataSubscription = window.trackRecordCloud.subscribeData(user, data => {
                     if (currentUser?.uid !== user.uid) return;
@@ -185,6 +190,7 @@
                 if (requestId !== authLoadRequestId) return;
                 currentUser = user;
                 appContent.classList.remove('hidden');
+                document.getElementById('startup-screen').classList.add('hidden');
                 updateAccountAction();
                 console.error('Could not load account data:', error);
                 showToast(`Could not load your cloud data: ${error.message}. You are still signed in; try reloading.`, 'error');
@@ -239,6 +245,7 @@
             document.getElementById('rule-experience-change').checked = creditRules.experienceChange;
             document.getElementById('rule-element-change').checked = creditRules.elementChange;
             document.getElementById('rule-relocated').checked = creditRules.relocated;
+            document.getElementById('rule-count-relogs').checked = creditRules.countRelogs;
         }
 
         function showAuthMessage(message, type = 'status') {
@@ -361,7 +368,8 @@
                 elementChange: typeof saved.elementChange === 'boolean'
                     ? saved.elementChange
                     : oldOverhaul || oldDrive,
-                relocated: typeof saved.relocated === 'boolean' ? saved.relocated : creditRules.relocated
+                relocated: typeof saved.relocated === 'boolean' ? saved.relocated : creditRules.relocated,
+                countRelogs: typeof saved.countRelogs === 'boolean' ? saved.countRelogs : false
             };
         }
 
@@ -486,7 +494,7 @@
                 if (variant === 'Relocated' && !creditRules.relocated) isCredit = false;
 
                 if (isCredit) {
-                    calculatedTotal++;
+                    calculatedTotal += creditRules.countRelogs ? group.rideCount : 1;
                 }
             });
 
@@ -1691,7 +1699,8 @@
                 water: document.getElementById('rule-water').checked,
                 experienceChange: document.getElementById('rule-experience-change').checked,
                 elementChange: document.getElementById('rule-element-change').checked,
-                relocated: document.getElementById('rule-relocated').checked
+                relocated: document.getElementById('rule-relocated').checked,
+                countRelogs: document.getElementById('rule-count-relogs').checked
             };
             saveToLocalStorage();
             updateStatsAndCounters();

@@ -442,7 +442,6 @@
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Official Coaster Name *</label>
                         <select id="form-official-coaster-name" onchange="selectOfficialCoasterName()" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
-                            <option value="">Choose a coaster name…</option>
                             <option value="__custom__">Custom name…</option>
                         </select>
                         <input type="text" id="form-coaster-name" oninput="updateRelogNameVariant()" placeholder="Enter coaster name" class="hidden mt-2 w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
@@ -450,7 +449,8 @@
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-400 mb-1">Coaster Name WHEN RIDDEN <span class="text-slate-500 font-normal">(Historic)</span></label>
-                        <input type="text" id="form-coaster-ridden" placeholder="e.g. Top Thrill Dragster" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <select id="form-coaster-ridden-option" onchange="selectRiddenCoasterName()" class="hidden w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500"></select>
+                        <input type="text" id="form-coaster-ridden" placeholder="e.g. Jr. Gemini" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                     </div>
                 </div>
 

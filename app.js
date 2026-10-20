@@ -1694,6 +1694,7 @@
                 /\b(?:new|different|all[\s-]new|entirely new|completely new)\s+(?:ride\s+)?experience\b/i.test(sentence) ||
                 /\b(?:experience|ride experience)\b[^.!?\n]{0,100}\b(?:(?:was|were|has been|have been)\s+)?(?:substantially\s+|completely\s+|significantly\s+)?(?:chang(?:e|ed|es|ing)|transform(?:ed|ation|ing)|replac(?:ed|ing)|reimagined)\b/i.test(sentence) ||
                 /\b(?:chang(?:e|ed|es|ing)|transform(?:ed|ation|ing)|replac(?:ed|ing)|reimagined)\b[^.!?\n]{0,100}\b(?:the\s+)?(?:ride\s+)?experience\b/i.test(sentence) ||
+                /\b(?:stand.?up|floorless)\b[^.!?\n]{0,120}\b(?:replac(?:e|ed|ing)|convert(?:ed|ing)?|chang(?:e|ed|ing)|switch(?:ed|ing)?)\b[^.!?\n]{0,80}\b(?:stand.?up|floorless)\b/i.test(sentence) ||
                 /\bconvert(?:ed|ing)?\b[^.!?\n]{0,100}\b(?:from\s+)?(?:outdoor|indoor)\b[^.!?\n]{0,100}\b(?:to\s+)?(?:outdoor|indoor|inside|outside)\b/i.test(sentence) ||
                 /\b(?:moved|relocated)\s+(?:the\s+)?(?:ride|coaster)?\s*(?:indoors|outdoors)\b/i.test(sentence) ||
                 /\b(?:converted|changed)\b[^.!?\n]{0,60}\b(?:into|to)\s+(?:an?\s+)?(?:indoor|outdoor)\s+(?:ride|coaster)\b/i.test(sentence) ||
@@ -1919,20 +1920,16 @@
             const names = ride?.sameVariationNames || [];
             if (!select || !nameInput) return;
             nameInput.value = selectedName;
-            if (!names.length) {
-                select.classList.add('hidden');
-                nameInput.classList.remove('hidden');
-                return;
-            }
-            select.innerHTML = `<option value="">Select a former name (optional)</option>${names
+            select.innerHTML = `${names.length ? '<option value="">Select a former name (optional)</option>' : ''}${names
                 .map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
                 .join('')}<option value="__custom__">Other name…</option>`;
             const matchingName = names.find(name =>
                 name.toLocaleLowerCase() === selectedName.toLocaleLowerCase()
             );
-            select.value = matchingName || (selectedName ? '__custom__' : '');
+            select.value = matchingName || (names.length && !selectedName ? '' : '__custom__');
             select.classList.remove('hidden');
-            nameInput.classList.toggle('hidden', !selectedName || Boolean(matchingName));
+            nameInput.classList.toggle('hidden', Boolean(matchingName) || (names.length > 0 && !selectedName));
+            nameInput.classList.add('mt-2');
         }
 
         function selectRiddenCoasterName() {

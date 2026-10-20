@@ -89,6 +89,7 @@
                 tabSearch.classList.remove('hidden');
                 btnSearch.className = "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-150 bg-brand-600 text-white shadow-sm";
                 btnLog.className = "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-150 text-slate-400 hover:text-white hover:bg-slate-800";
+                if (currentParkRides.length) renderRidesList();
                 if (!document.getElementById('park-search-input').value.trim()) {
                     searchCoasterpedia();
                 }
@@ -190,6 +191,7 @@
                     updateStatsAndCounters();
                     renderLogbook();
                     if (!document.getElementById('park-breakdown').classList.contains('hidden')) renderParkBreakdown();
+                    refreshVisibleSearchResults();
                 }, error => {
                     console.error('Firebase live sync failed:', error);
                     showToast(`Live sync stopped: ${error.message}`, 'error');
@@ -1623,8 +1625,29 @@
         }
 
         function getCoasterpediaChangeEvidence(wikitext) {
+            const historySections = [...wikitext.matchAll(/^={2,}\s*history\s*={2,}\s*$/gim)]
+                .map(match => {
+                    const contentStart = match.index + match[0].length;
+                    const sectionContent = wikitext.slice(contentStart);
+                    const nextHeadingOffset = sectionContent.search(/^={2,}.*$/m);
+                    return sectionContent.slice(0, nextHeadingOffset < 0 ? undefined : nextHeadingOffset);
+                })
+                .join('\n');
+            const historyTableText = historySections
+                .replace(/\{\|[\s\S]*?\|\}/g, table => table
+                    .replace(/^\{\|.*$/gm, ' ')
+                    .replace(/^\|-.*$/gm, '\n')
+                    .replace(/^\s*[|!]\s*/gm, ' ')
+                    .replace(/\|\||!!/g, '\n')
+                    .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2')
+                    .replace(/\[\[([^\]]+)\]\]/g, '$1')
+                    .replace(/<ref\b[^>]*>[\s\S]*?<\/ref\s*>/gi, ' ')
+                    .replace(/<ref\b[^>]*\/\s*>/gi, ' ')
+                    .replace(/<[^>]+>/g, ' ')
+                    .replace(/'{2,}/g, ' '));
             const articleText = wikitext
                 .split(/^={2,}\s*(?:references|external links|further reading|notes)\s*={2,}\s*$/im)[0]
+                .concat(`\n${historyTableText}`)
                 .replace(/<!--[\s\S]*?-->/g, '')
                 .replace(/<ref\b[^>]*>[\s\S]*?<\/ref\s*>/gi, ' ')
                 .replace(/<ref\b[^>]*\/\s*>/gi, ' ')
@@ -1668,6 +1691,9 @@
 
         function isMajorRideTransformation(sentence) {
             return /\b(?:virtual reality|vr)\s+(?:overlay|experience|conversion|version)\b/i.test(sentence) ||
+                /\b(?:new|different|all[\s-]new|entirely new|completely new)\s+(?:ride\s+)?experience\b/i.test(sentence) ||
+                /\b(?:experience|ride experience)\b[^.!?\n]{0,100}\b(?:(?:was|were|has been|have been)\s+)?(?:substantially\s+|completely\s+|significantly\s+)?(?:chang(?:e|ed|es|ing)|transform(?:ed|ation|ing)|replac(?:ed|ing)|reimagined)\b/i.test(sentence) ||
+                /\b(?:chang(?:e|ed|es|ing)|transform(?:ed|ation|ing)|replac(?:ed|ing)|reimagined)\b[^.!?\n]{0,100}\b(?:the\s+)?(?:ride\s+)?experience\b/i.test(sentence) ||
                 /\bconvert(?:ed|ing)?\b[^.!?\n]{0,100}\b(?:from\s+)?(?:outdoor|indoor)\b[^.!?\n]{0,100}\b(?:to\s+)?(?:outdoor|indoor|inside|outside)\b/i.test(sentence) ||
                 /\b(?:moved|relocated)\s+(?:the\s+)?(?:ride|coaster)?\s*(?:indoors|outdoors)\b/i.test(sentence) ||
                 /\b(?:converted|changed)\b[^.!?\n]{0,60}\b(?:into|to)\s+(?:an?\s+)?(?:indoor|outdoor)\s+(?:ride|coaster)\b/i.test(sentence) ||
@@ -1799,6 +1825,12 @@
             });
 
             grid.innerHTML = html;
+        }
+
+        function refreshVisibleSearchResults() {
+            if (!document.getElementById('tab-search').classList.contains('hidden') && currentParkRides.length) {
+                renderRidesList();
+            }
         }
 
         function filterRidesList() {
@@ -2271,39 +2303,15 @@
             if (!requireSignedIn()) return;
             if (!confirm('Are you sure you want to remove this coaster entry?')) return;
             const group = getCoasterLogGroups().find(item => item.entries.some(entry => entry.id === id));
-            const entry = group?.entry;
             const groupIds = new Set((group?.entries || []).map(entry => entry.id));
             coasterLog = coasterLog.filter(entry => !groupIds.has(entry.id));
-            if (entry) removeSearchRideForEntry(entry);
             saveToLocalStorage();
             updateStatsAndCounters();
             renderLogbook();
             if (!document.getElementById('park-breakdown').classList.contains('hidden')) renderParkBreakdown();
             showToast('Entry removed from logbook', 'info');
 
-            if (!document.getElementById('tab-search').classList.contains('hidden')) {
-                renderRidesList();
-            }
-        }
-
-        function removeSearchRideForEntry(entry) {
-            const entryPark = (entry.parkName || entry.parkNameRidden || '').trim().toLocaleLowerCase();
-            const rideId = String(entry.coasterpediaRideId || '').toLocaleLowerCase();
-            const trackSpecificRide = /::track-\d+$/i.test(rideId);
-            const entryNames = [entry.coasterName, entry.coasterNameRidden]
-                .filter(Boolean)
-                .map(name => name.toLocaleLowerCase());
-            currentParkRides = currentParkRides.filter(ride => {
-                if ((ride.parkName || '').trim().toLocaleLowerCase() !== entryPark) return true;
-                const rideSourceId = String(ride.sourceRideId || ride.id).toLocaleLowerCase();
-                const matchesRide = rideId
-                    ? (trackSpecificRide
-                        ? rideSourceId === rideId
-                        : rideSourceId.replace(/::track-\d+$/i, '') === rideId.replace(/::track-\d+$/i, ''))
-                    : [ride.name, ...(ride.historicalNames || [])]
-                        .some(name => entryNames.includes(name.toLocaleLowerCase()));
-                return !matchesRide;
-            });
+            refreshVisibleSearchResults();
         }
 
         // Settings Modal Handlers

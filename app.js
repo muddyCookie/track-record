@@ -737,6 +737,7 @@
                     .filter(name => name && name !== entry.coasterName))];
                 const openingEntry = group.entries.find(item => item.coasterpediaOpeningDate || item.coasterpediaClosingDate);
                 const operatingDates = [openingEntry?.coasterpediaOpeningDate, openingEntry?.coasterpediaClosingDate]
+                    .map(formatCoasterpediaYear)
                     .filter(Boolean)
                     .join('–');
 
@@ -1343,45 +1344,25 @@
             }
 
             const ridesByTitle = new Map(currentParkRides.map(ride => [ride.pageTitle.toLowerCase(), ride]));
-            const knownNames = new Set(currentParkRides.map(ride => ride.name.toLowerCase()));
             currentParkRides.forEach(ride => {
                 const details = articlesByTitle.get(ride.pageTitle.toLowerCase());
                 if (!details) return;
+                ride.variant = 'Original';
+                ride.hasReimaginedVersion = false;
                 ride.openingDate = details.openingDate;
                 ride.closingDate = details.closingDate;
-                ride.changeClassification = details.changeClassification;
                 ride.nameHistory = details.nameHistory;
-                if (ride.name.toLocaleLowerCase() === details.currentName.toLocaleLowerCase()) {
-                    const currentNameIndex = details.nameHistory.findIndex(item =>
-                        item.name.toLocaleLowerCase() === details.currentName.toLocaleLowerCase()
-                    );
-                    ride.historicalNames = [...new Set([
-                        ...(ride.historicalNames || []),
-                        ...details.nameHistory
-                            .slice(0, currentNameIndex < 0 ? 0 : currentNameIndex)
-                            .map(item => item.name)
-                            .filter(name => name.toLocaleLowerCase() !== ride.name.toLocaleLowerCase())
-                    ])];
-                }
-                const currentNameVersion = details.nameHistory.find(item =>
-                    item.name.toLocaleLowerCase() === details.currentName.toLocaleLowerCase()
-                );
-                ride.changeYear = details.changeClassification === 'reimagined'
-                    ? currentNameVersion?.from || details.changeYear
-                    : details.changeYear;
-                ride.hasReimaginedVersion = details.hasReimaginedVersion;
-                const currentNameIndex = details.nameHistory.findIndex(item =>
-                    item.name.toLocaleLowerCase() === details.currentName.toLocaleLowerCase()
-                );
-                const listedNameIndex = details.nameHistory.findIndex(item =>
-                    item.name.toLocaleLowerCase() === ride.name.toLocaleLowerCase()
-                );
-                if (details.changeClassification === 'reimagined' &&
-                    details.nameHistory.length > 1 &&
-                    listedNameIndex === currentNameIndex) {
-                    ride.variant = 'ElementChange';
-                } else if (details.changeClassification === 'uncertain' && details.nameHistory.length > 1) {
-                    ride.variant = 'ReviewChange';
+                ride.currentName = details.currentName;
+                const canonicalName = details.currentName || ride.name;
+                ride.historicalNames = [...new Set([
+                    ...(ride.historicalNames || []),
+                    ride.name,
+                    ...details.nameHistory
+                        .map(item => item.name)
+                        .filter(name => name.toLocaleLowerCase() !== canonicalName.toLocaleLowerCase())
+                ])].filter(name => name.toLocaleLowerCase() !== canonicalName.toLocaleLowerCase());
+                if (details.currentName) {
+                    ride.name = details.currentName;
                 }
                 if (details.tracks < 2) return;
                 ride.trackCount = details.tracks;
@@ -1400,48 +1381,17 @@
                     const normalizedRedirectName = redirectName.toLowerCase();
                     const name = [...historicalNames].find(historicalName =>
                         historicalName.toLowerCase() === normalizedRedirectName
+                    ) || redirectName;
+                    ride.historicalNames = [...new Set([
+                        ...(ride.historicalNames || []),
+                        name
+                    ])].filter(historicalName =>
+                        historicalName.toLocaleLowerCase() !== ride.name.toLocaleLowerCase()
                     );
-                    if (!name) return;
-                    const nameKey = name.toLowerCase();
-                    if (knownNames.has(nameKey)) return;
-                    knownNames.add(nameKey);
-                    const details = articlesByTitle.get(page.title.toLowerCase());
-                    const changeClassification = details?.changeClassification || 'uncertain';
-                    if (isNameOnlyRideChange(ride.name, name) || changeClassification === 'minor') {
-                        ride.historicalNames = [...new Set([...(ride.historicalNames || []), name])];
-                        return;
-                    }
-                    const formerNameIndex = details?.nameHistory?.findIndex(item =>
-                        item.name.toLocaleLowerCase() === name.toLocaleLowerCase()
-                    ) ?? -1;
-                    const currentNameIndex = details?.nameHistory?.findIndex(item =>
-                        item.name.toLocaleLowerCase() === details.currentName?.toLocaleLowerCase()
-                    ) ?? -1;
-                    let variant = changeClassification === 'reimagined'
-                        ? (formerNameIndex >= 0 && currentNameIndex >= 0 && formerNameIndex < currentNameIndex
-                            ? 'Original'
-                            : 'ElementChange')
-                        : 'ReviewChange';
-                    if (changeClassification === 'reimagined' &&
-                        ride.name.toLocaleLowerCase() === details.currentName?.toLocaleLowerCase()) {
-                        ride.variant = 'ElementChange';
-                    }
-                    currentParkRides.push({
-                        id: `${ride.id}::${name}`,
-                        name,
-                        pageTitle: ride.pageTitle,
-                        sourceRideId: ride.sourceRideId,
-                        openingDate: ride.openingDate,
-                        closingDate: ride.closingDate,
-                        entityType: 'Former coaster',
-                        parkName: ride.parkName,
-                        type: ride.type,
-                        rideType: ride.rideType,
-                        variant
-                    });
                 });
             });
 
+            collapseCoasterHistoryAliases();
             collapseMinorRideAliases();
             currentParkRides = currentParkRides.flatMap(ride => {
                 if (!ride.trackNames) return [ride];
@@ -1453,6 +1403,43 @@
                     trackIndex: index + 1,
                     trackNames: undefined
                 }));
+            });
+        }
+
+        function collapseCoasterHistoryAliases() {
+            const ridesByIdentity = new Map();
+            currentParkRides.forEach(ride => {
+                const identity = (ride.sourceRideId || ride.pageTitle || ride.id).toLocaleLowerCase();
+                if (!ridesByIdentity.has(identity)) ridesByIdentity.set(identity, []);
+                ridesByIdentity.get(identity).push(ride);
+            });
+
+            currentParkRides = [...ridesByIdentity.values()].map(rides => {
+                if (rides.length === 1) {
+                    rides[0].variant = 'Original';
+                    rides[0].hasReimaginedVersion = false;
+                    return rides[0];
+                }
+
+                const canonicalRide = rides.find(ride =>
+                    ride.currentName &&
+                    ride.name.toLocaleLowerCase() === ride.currentName.toLocaleLowerCase()
+                ) || rides.find(ride => ride.entityType === 'Present coaster') || rides[0];
+                const currentName = canonicalRide.currentName || canonicalRide.name;
+                canonicalRide.historicalNames = [...new Set(rides.flatMap(ride => [
+                    ride.name,
+                    ...(ride.historicalNames || []),
+                    ...(ride.nameHistory || []).map(item => item.name)
+                ]))].filter(name =>
+                    name.toLocaleLowerCase() !== currentName.toLocaleLowerCase()
+                );
+                if (rides.some(ride => ride.entityType === 'Present coaster')) {
+                    canonicalRide.entityType = 'Present coaster';
+                }
+                canonicalRide.name = currentName;
+                canonicalRide.variant = 'Original';
+                canonicalRide.hasReimaginedVersion = false;
+                return canonicalRide;
             });
         }
 
@@ -1645,18 +1632,21 @@
 
         function parseCoasterpediaDate(value) {
             const dateText = cleanCoasterpediaCell(value).replace(/\s+/g, ' ').trim();
-            const exactDate = dateText.match(/\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+(?:18|19|20)\d{2}\b/i);
-            return exactDate?.[0] ||
-                dateText.match(/\b(?:18|19|20)\d{2}-\d{2}-\d{2}\b/)?.[0] ||
-                dateText.match(/\b(?:18|19|20)\d{2}\b/)?.[0] ||
-                '';
+            return formatCoasterpediaYear(dateText);
+        }
+
+        function formatCoasterpediaYear(value = '') {
+            return String(value).match(/\b(?:18|19|20)\d{2}\b/)?.[0] || '';
         }
 
         function renderRidesList() {
             const grid = document.getElementById('rides-grid');
             const searchVal = document.getElementById('ride-search-filter').value.toLowerCase().trim();
 
-            const filtered = currentParkRides.filter(r => r.name.toLowerCase().includes(searchVal));
+            const filtered = currentParkRides.filter(ride =>
+                [ride.name, ...(ride.historicalNames || [])]
+                    .some(name => name.toLocaleLowerCase().includes(searchVal))
+            );
             const distinctRideIdsByName = new Map();
             currentParkRides.forEach(ride => {
                 const nameKey = ride.name.toLocaleLowerCase();
@@ -1699,6 +1689,8 @@
                     const loggedEntry = matchingParkEntries.find(entry =>
                         entry.coasterpediaRideId === rideSourceId &&
                         rideEntryVariant(entry) === normalizeRideVariant(ride.variant)
+                    ) || matchingParkEntries.find(entry =>
+                        entry.coasterpediaRideId === rideSourceId
                     ) || (sameNameRideCount === 1
                         ? matchingParkEntries.find(entry =>
                             !entry.coasterpediaRideId &&
@@ -1712,8 +1704,8 @@
                     const articleUrl = `https://coasterpedia.net/wiki/${encodeURIComponent(ride.pageTitle.replace(/ /g, '_'))}`;
                     const rideType = ride.rideType || classifyRideLabel(ride.type || '');
                     const variant = normalizeRideVariant(ride.variant);
-                    const disambiguatingOpeningDate = sameNameRideCount > 1 ? ride.openingDate || '' : '';
-                    const disambiguatingClosingDate = sameNameRideCount > 1 ? ride.closingDate || '' : '';
+                    const disambiguatingOpeningDate = sameNameRideCount > 1 ? formatCoasterpediaYear(ride.openingDate) : '';
+                    const disambiguatingClosingDate = sameNameRideCount > 1 ? formatCoasterpediaYear(ride.closingDate) : '';
                     const disambiguatingDateLabel = [disambiguatingOpeningDate, disambiguatingClosingDate].filter(Boolean).join('–');
                     const dateLabel = disambiguatingDateLabel
                         ? `<p class="mt-1 text-[11px] text-slate-500">Dates ${escapeHtml(disambiguatingDateLabel)}</p>`

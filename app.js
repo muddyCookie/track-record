@@ -1291,7 +1291,9 @@
                         .map(([, title, label]) => cleanCoasterpediaCell(label || title));
                     return links.length ? links : [cleanCoasterpediaCell(part)];
                 });
-            }).filter(Boolean))];
+            }).filter(Boolean))].map(name =>
+                name.replace(/\s*\((?:18|19|20)\d{2}\s*[-–—]\s*(?:(?:18|19|20)\d{2}|present|current)?\)\s*$/i, '').trim()
+            ).filter(Boolean);
         }
 
         function classifyRideLabel(value) {
@@ -1564,9 +1566,8 @@
                 : pastParkInfobox?.wikitext || '';
             const changeEvidence = getCoasterpediaChangeEvidence(wikitext);
             const changeClassification = classifyCoasterpediaChange(wikitext, infobox, nameHistory);
-            const variationChangeNames = changeClassification === 'reimagined' && nameHistory.length > 1
-                ? nameHistory
-                    .map(item => item.name)
+            const variationChangeNames = changeClassification === 'reimagined'
+                ? historicalNamesForPark
                     .filter(name =>
                         name.toLocaleLowerCase() !== currentName.toLocaleLowerCase() &&
                         !isNameOnlyRideChange(currentName, name)
@@ -1698,8 +1699,20 @@
                 /\b(?:replac(?:ed|ing)|convert(?:ed|ing)|chang(?:ed|ing)|switch(?:ed|ing)|from|to)\b/i.test(sentence);
         }
 
+        function isRideTypeConversion(sentence) {
+            const rideType = '(?:floorless|stand[ -]?up|sit[ -]?down|inverted|launched|wood(?:en)?|steel|flying|wing|suspended|spinning|pipeline|4d)';
+            const changeAction = '(?:conversion|convert(?:ed|s|ing)?|switch(?:ed|es|ing)?|chang(?:e|ed|es|ing)|replac(?:e|ed|es|ing)|transform(?:ed|s|ing)|transition(?:ed|s|ing))';
+            const typeTransition = new RegExp(`\\b${rideType}\\b[^.!?\\n]{0,100}\\b${changeAction}\\b[^.!?\\n]{0,100}\\b${rideType}\\b`, 'i');
+            const transitionToType = new RegExp(`\\b${changeAction}\\b[^.!?\\n]{0,100}\\b${rideType}\\b`, 'i');
+            const typeConversion = new RegExp(`\\b${rideType}\\s+conversion\\b|\\bconversion\\b[^.!?\\n]{0,80}\\b${rideType}\\b`, 'i');
+            return typeTransition.test(sentence) || transitionToType.test(sentence) || typeConversion.test(sentence);
+        }
+
         function isMajorRideTransformation(sentence) {
             return /\b(?:virtual reality|vr)\s+(?:overlay|experience|conversion|version)\b/i.test(sentence) ||
+                isRideTypeConversion(sentence) ||
+                /\bfloorless\s+conversion\b/i.test(sentence) ||
+                /\bconversion\b[^.!?\n]{0,100}\bfloorless\b/i.test(sentence) ||
                 /\b(?:new|different|all[\s-]new|entirely new|completely new)\s+(?:ride\s+)?experience\b/i.test(sentence) ||
                 /\b(?:experience|ride experience)\b[^.!?\n]{0,100}\b(?:(?:was|were|has been|have been)\s+)?(?:substantially\s+|completely\s+|significantly\s+)?(?:chang(?:e|ed|es|ing)|transform(?:ed|ation|ing)|replac(?:ed|ing)|reimagined)\b/i.test(sentence) ||
                 /\b(?:chang(?:e|ed|es|ing)|transform(?:ed|ation|ing)|replac(?:ed|ing)|reimagined)\b[^.!?\n]{0,100}\b(?:the\s+)?(?:ride\s+)?experience\b/i.test(sentence) ||

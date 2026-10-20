@@ -1,6 +1,6 @@
 # Track Record
 
-A static website for tracking coaster rides and credits. The page layout is in `index.html`, interactive behavior is in `app.js`, and Firebase Authentication/Cloud Firestore provide private per-account sign-in and cross-device sync. There is no application server or build step.
+A static website for tracking coaster rides and credits. The page layout is in `index.html`, interactive behavior is in `app.js`, and Firebase Authentication/Cloud Firestore provide private per-account sign-in and cross-device sync. There is no application server or build step. Relogging opens the entry editor: saving the same ride adds a lap, while changing the coaster name creates a separate log for that version. Coaster search uses Coasterpedia's park-specific Past Names and history to default significant ride changes to Reimagined and former-park entries to Relocated; Reimagined is shown when applicable, but Relocated and Needs Review are not displayed as search tags.
 
 ## Test locally
 

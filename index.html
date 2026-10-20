@@ -40,6 +40,13 @@
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        .auth-overlay {
+            display: grid;
+            place-items: center;
+        }
+        .auth-overlay.hidden {
+            display: none;
+        }
         .dashboard-stat-card.is-active {
             background: linear-gradient(135deg, rgba(var(--active-accent), 0.24), rgba(30, 41, 59, 0.94)) !important;
             border-color: rgba(var(--active-accent), 0.7) !important;
@@ -52,8 +59,8 @@
     <!-- Toast Notification Overlay -->
     <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-    <div id="auth-screen" class="fixed inset-0 z-[60] hidden items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-        <form id="auth-form" onsubmit="submitAuthForm(event)" class="w-full max-w-md rounded-2xl border border-bordercolor bg-cardbg p-6 shadow-2xl">
+    <div id="auth-screen" class="auth-overlay fixed inset-0 z-[60] hidden bg-slate-950/80 p-4 backdrop-blur-sm" onclick="if (event.target === this) closeAuthDialog()">
+        <form id="auth-form" onsubmit="submitAuthForm(event)" class="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-bordercolor bg-cardbg p-6 shadow-2xl">
             <div class="mb-6 flex items-center gap-3">
                 <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 text-white shadow-md shadow-brand-500/20">
                     <svg viewBox="0 0 24 24" class="h-7 w-7" fill="none" aria-hidden="true">

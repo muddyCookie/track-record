@@ -35,7 +35,10 @@
         window.onload = async function() {
             try {
                 await window.trackRecordCloud.ready;
-                await handleFirebaseAuthState(window.trackRecordCloud.getCurrentUser());
+                const user = window.trackRecordCloud.getCurrentUser();
+                currentUser = user;
+                updateAccountAction();
+                await handleFirebaseAuthState(user);
                 authStateSubscription = window.trackRecordCloud.onAuthStateChanged(user => {
                     if (user?.uid === currentUser?.uid || (!user && !currentUser)) return;
                     handleFirebaseAuthState(user).catch(error => {
@@ -120,14 +123,14 @@
             }
 
             currentUser = user;
+            updateAccountAction();
             cloudDataSubscription?.();
             cloudDataSubscription = null;
-            appContent.classList.add('hidden');
-            authScreen.classList.remove('hidden');
-            authScreen.classList.add('flex');
-            document.getElementById('auth-submit').disabled = true;
-            document.getElementById('continue-as-guest').classList.add('hidden');
-            showAuthMessage('Loading your private coaster log...', 'status');
+            appContent.classList.remove('hidden');
+            authScreen.classList.add('hidden');
+            document.getElementById('auth-submit').disabled = false;
+            document.getElementById('continue-as-guest').classList.remove('hidden');
+            showAuthMessage('', 'status');
 
             try {
                 const remoteData = await window.trackRecordCloud.loadData(user);
@@ -159,7 +162,6 @@
                 document.getElementById('auth-retry').classList.add('hidden');
                 document.getElementById('auth-signout').classList.add('hidden');
                 authScreen.classList.add('hidden');
-                authScreen.classList.remove('flex');
                 appContent.classList.remove('hidden');
                 updateAccountAction();
                 cloudDataSubscription = window.trackRecordCloud.subscribeData(user, data => {
@@ -181,19 +183,16 @@
                 refreshLoggedRideStatuses();
             } catch (error) {
                 if (requestId !== authLoadRequestId) return;
-                currentUser = null;
+                currentUser = user;
                 appContent.classList.remove('hidden');
-                document.getElementById('auth-submit').disabled = false;
-                document.getElementById('auth-retry').classList.remove('hidden');
-                document.getElementById('auth-signout').classList.remove('hidden');
-                document.getElementById('continue-as-guest').classList.remove('hidden');
                 updateAccountAction();
-                showAuthMessage(`Could not load your cloud data: ${error.message}`, 'error');
+                console.error('Could not load account data:', error);
+                showToast(`Could not load your cloud data: ${error.message}. You are still signed in; try reloading.`, 'error');
             }
         }
 
         function updateAccountAction() {
-            const signedIn = Boolean(currentUser);
+            const signedIn = Boolean(window.trackRecordCloud?.getCurrentUser() || currentUser);
             document.getElementById('account-action-label').innerText = signedIn ? 'Sign out' : 'Sign in';
             document.getElementById('account-action-icon').className = signedIn
                 ? 'fa-solid fa-arrow-right-from-bracket'
@@ -204,16 +203,13 @@
         function openAuthDialog(message = '') {
             const authScreen = document.getElementById('auth-screen');
             authScreen.classList.remove('hidden');
-            authScreen.classList.add('flex');
             document.getElementById('auth-submit').disabled = false;
             document.getElementById('continue-as-guest').classList.toggle('hidden', Boolean(currentUser));
             showAuthMessage(message, 'status');
         }
 
         function closeAuthDialog() {
-            if (currentUser) return;
             document.getElementById('auth-screen').classList.add('hidden');
-            document.getElementById('auth-screen').classList.remove('flex');
             showAuthMessage('', 'status');
         }
 

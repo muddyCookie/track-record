@@ -1781,7 +1781,6 @@
             if (!openAddModal()) return;
             document.getElementById('form-park-name').value = parkName;
             document.getElementById('form-park-ridden').value = '';
-            document.getElementById('form-coaster-name').value = rideName;
             document.getElementById('form-coaster-ridden').value = '';
             document.getElementById('form-coaster-type').value = type;
             document.getElementById('form-variant-type').value = normalizeRideVariant(variant);
@@ -1793,14 +1792,19 @@
                 (item.sourceRideId || item.id) === rideId
             );
             setRideNameVersionOptions(ride);
+            selectOfficialCoasterName(rideName);
         }
 
         function setRideNameVersionOptions(ride = null) {
             rideNameVersionOptions = new Map();
-            const datalist = document.getElementById('form-coaster-name-options');
-            if (!datalist) return;
+            const select = document.getElementById('form-official-coaster-name');
+            const nameInput = document.getElementById('form-coaster-name');
+            if (!select) return;
             if (!ride) {
-                datalist.replaceChildren();
+                select.replaceChildren();
+                select.classList.add('hidden');
+                nameInput.classList.remove('hidden');
+                nameInput.required = true;
                 return;
             }
 
@@ -1817,9 +1821,36 @@
                     variant
                 });
             });
-            datalist.innerHTML = options
-                .map(({ name }) => `<option value="${escapeHtml(name)}"></option>`)
-                .join('');
+            select.innerHTML = [
+                ...options.map(({ name }) =>
+                    `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`
+                ),
+                '<option value="__custom__">Custom name…</option>'
+            ].join('');
+            select.classList.remove('hidden');
+            nameInput.classList.add('hidden');
+            nameInput.required = false;
+            select.value = options[0]?.name || '__custom__';
+            if (!options.length) selectOfficialCoasterName('__custom__');
+        }
+
+        function selectOfficialCoasterName(name = '') {
+            const select = document.getElementById('form-official-coaster-name');
+            const nameInput = document.getElementById('form-coaster-name');
+            const selectedName = name || select.value;
+            if (selectedName === '__custom__' || !rideNameVersionOptions.has(selectedName.toLocaleLowerCase())) {
+                if (selectedName === '__custom__') nameInput.value = '';
+                select.value = '__custom__';
+                nameInput.classList.remove('hidden');
+                nameInput.required = true;
+                if (selectedName === '__custom__') nameInput.focus();
+                return;
+            }
+            nameInput.value = selectedName;
+            select.value = selectedName;
+            nameInput.classList.add('hidden');
+            nameInput.required = false;
+            updateRideClassificationFromName();
         }
 
         function updateRideClassificationFromName() {
@@ -1899,6 +1930,7 @@
                 (ride.sourceRideId || ride.id) === entry.coasterpediaRideId
             );
             setRideNameVersionOptions(matchingRide);
+            if (matchingRide) selectOfficialCoasterName(entry.coasterName || '');
 
             document.getElementById('modal-entry').classList.remove('hidden');
             return true;

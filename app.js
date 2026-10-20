@@ -433,10 +433,23 @@
         function displayRideNameForSearch(ride, searchVal = '') {
             if (!searchVal || ride.name.toLocaleLowerCase().includes(searchVal)) return ride.name;
             return [
-                ...(ride.variationChangeNames || []),
-                ...(ride.sameVariationNames || []),
-                ...(ride.historicalNames || [])
+                ...rideFormerNames(ride, 'variationChangeNames'),
+                ...rideFormerNames(ride, 'sameVariationNames'),
+                ...rideFormerNames(ride)
             ].find(name => name.toLocaleLowerCase().includes(searchVal)) || ride.name;
+        }
+
+        function cleanRideFormerNames(names = [], currentName = '') {
+            const currentKey = currentName.toLocaleLowerCase();
+            return [...new Map(names
+                .map(cleanCoasterpediaFormerName)
+                .filter(name => isLikelyCoasterFormerName(name) && name.toLocaleLowerCase() !== currentKey)
+                .map(name => [name.toLocaleLowerCase(), name])
+            ).values()];
+        }
+
+        function rideFormerNames(ride, key = 'historicalNames') {
+            return cleanRideFormerNames(ride?.[key] || [], ride?.name || '');
         }
 
         function rideIdentityKey(entry) {
@@ -1129,7 +1142,7 @@
             const ridesByName = new Map();
             rides.forEach(ride => {
                 const status = ride.entityType.startsWith('Former') ? 'Former' : 'Present';
-                [ride.name, ...(ride.historicalNames || [])].forEach(name => {
+                [ride.name, ...rideFormerNames(ride)].forEach(name => {
                     ridesByName.set(normalizeRideStatusName(name), status);
                 });
             });
@@ -1512,9 +1525,9 @@
                 ride.closingDate = details.closingDate;
                 ride.nameHistory = details.nameHistory;
                 ride.currentName = details.currentName;
-                ride.historicalNames = details.historicalNamesForPark;
-                ride.sameVariationNames = details.sameVariationNamesForPark;
-                ride.variationChangeNames = details.variationChangeNamesForPark;
+                ride.historicalNames = cleanRideFormerNames(details.historicalNamesForPark, details.parkSpecificName || ride.name);
+                ride.sameVariationNames = cleanRideFormerNames(details.sameVariationNamesForPark, details.parkSpecificName || ride.name);
+                ride.variationChangeNames = cleanRideFormerNames(details.variationChangeNamesForPark, details.parkSpecificName || ride.name);
                 if (details.parkSpecificName) ride.name = details.parkSpecificName;
                 if (details.tracks < 2) return;
                 ride.trackCount = details.tracks;
@@ -1558,14 +1571,15 @@
                     ride.name,
                     ...(ride.historicalNames || [])
                 ]))].filter(name =>
+                    isLikelyCoasterFormerName(name) &&
                     name.toLocaleLowerCase() !== parkName.toLocaleLowerCase()
                 );
                 canonicalRide.sameVariationNames = [...new Set(
                     rides.flatMap(ride => ride.sameVariationNames || [])
-                )];
+                )].filter(isLikelyCoasterFormerName);
                 canonicalRide.variationChangeNames = [...new Set(
                     rides.flatMap(ride => ride.variationChangeNames || [])
-                )];
+                )].filter(isLikelyCoasterFormerName);
                 if (rides.some(ride => ride.entityType === 'Present coaster')) {
                     canonicalRide.entityType = 'Present coaster';
                 }
@@ -1605,14 +1619,14 @@
                     ...matchingRides
                         .filter(ride => ride !== canonicalRide)
                         .flatMap(ride => ride.historicalNames || [])
-                ])];
+                ])].filter(isLikelyCoasterFormerName);
                 canonicalRide.sameVariationNames = [...new Set([
                     ...(canonicalRide.sameVariationNames || []),
                     formerName,
                     ...matchingRides
                         .filter(ride => ride !== canonicalRide)
                         .flatMap(ride => ride.sameVariationNames || [])
-                ])];
+                ])].filter(isLikelyCoasterFormerName);
                 currentParkRides = currentParkRides.filter(ride =>
                     !matchingRides.includes(ride) || ride === canonicalRide
                 );
@@ -1893,7 +1907,7 @@
             const searchVal = document.getElementById('ride-search-filter').value.toLowerCase().trim();
 
             const filtered = currentParkRides.filter(ride =>
-                [ride.name, ...(ride.historicalNames || [])]
+                [ride.name, ...rideFormerNames(ride)]
                     .some(name => name.toLocaleLowerCase().includes(searchVal))
             );
             const distinctRideIdsByName = new Map();
@@ -1925,7 +1939,8 @@
                         <div class="divide-y divide-bordercolor/70 border-t border-bordercolor">
                 `;
                 section.rides.forEach(ride => {
-                    const searchableRideNames = [ride.name, ...(ride.historicalNames || [])]
+                    const historicalNames = rideFormerNames(ride);
+                    const searchableRideNames = [ride.name, ...historicalNames]
                         .map(name => name.toLocaleLowerCase());
                     const rideSourceId = ride.sourceRideId || ride.id;
                     const sameNameRideCount = distinctRideIdsByName.get(ride.name.toLocaleLowerCase())?.size || 1;
@@ -1986,7 +2001,7 @@
                                         : ''}
                                 </div>
                                 ${isHistoricalDisplayName ? `<p class="mt-1 text-[11px] text-slate-500">Current name ${escapeHtml(ride.name)}</p>` : ''}
-                                ${!isHistoricalDisplayName && ride.historicalNames?.length ? `<p class="mt-1 text-[11px] text-slate-500">Previously known as ${ride.historicalNames.map(escapeHtml).join(', ')}</p>` : ''}
+                                ${!isHistoricalDisplayName && historicalNames.length ? `<p class="mt-1 text-[11px] text-slate-500">Previously known as ${historicalNames.map(escapeHtml).join(', ')}</p>` : ''}
                                 ${ride.hasReimaginedVersion ? `<p class="mt-1 text-[11px] text-violet-300">Coasterpedia history indicates a substantial ride change${ride.changeYear ? ` around ${escapeHtml(ride.changeYear)}` : ''}; you can log the reimagined version separately.</p>` : ''}
                                 ${dateLabel}
                                 ${sameNameRideCount > 1 && matchingParkEntries.some(entry => !entry.coasterpediaRideId)
@@ -2052,7 +2067,7 @@
             const names = [
                 ...(ride ? [
                     { name: ride.name, variant: normalizeRideVariant(ride.variant) },
-                    ...(ride.variationChangeNames || []).map(name => ({
+                    ...rideFormerNames(ride, 'variationChangeNames').map(name => ({
                         name,
                         variant: rideVersionVariantForName(ride, name)
                     }))
@@ -2105,7 +2120,7 @@
         function setRiddenCoasterNameOptions(ride = null, selectedName = '') {
             const select = document.getElementById('form-coaster-ridden-option');
             const nameInput = document.getElementById('form-coaster-ridden');
-            const names = ride?.sameVariationNames || [];
+            const names = rideFormerNames(ride, 'sameVariationNames');
             if (!select || !nameInput) return;
             nameInput.value = selectedName;
             select.innerHTML = `${names.length ? '<option value="">Select a former name (optional)</option>' : ''}${names

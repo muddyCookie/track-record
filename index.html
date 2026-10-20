@@ -420,6 +420,9 @@
 
             <form id="entry-form" onsubmit="saveEntry(event)" class="p-6 overflow-y-auto space-y-4 text-xs">
                 <input type="hidden" id="form-entry-id">
+                <input type="hidden" id="form-coasterpedia-ride-id">
+                <input type="hidden" id="form-coasterpedia-opening-date">
+                <input type="hidden" id="form-coasterpedia-closing-date">
                 <input type="hidden" id="form-ride-status" value="Unknown">
 
                 <!-- Park Names Row -->
@@ -461,11 +464,12 @@
                         <label class="block font-semibold text-slate-300 mb-1">Ride Version / Variation *</label>
                         <select id="form-variant-type" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                             <option value="Original">Original</option>
-                            <option value="ExperienceChange">Same Track, Different Experience</option>
-                            <option value="ElementChange">Track / Element Change</option>
+                            <option value="ExperienceChange">Experience change (track unchanged)</option>
+                            <option value="ElementChange">Reimagined (track / element or major ride change)</option>
                             <option value="Relocated">Relocated</option>
+                            <option value="ReviewChange">Needs review (not counted yet)</option>
                         </select>
-                        <p class="mt-1 text-[10px] text-slate-500">Present/former status follows Coasterpedia's current park list. For a relocated ride with changed track or elements, choose Track / Element Change.</p>
+                        <p class="mt-1 text-[10px] text-slate-500">Reimagined is for substantial track, ride-element, or major ride transformations. Name-only, paint, train, or VR changes stay one credit. Unclear histories need review and do not count toward Total until resolved.</p>
                     </div>
                 </div>
 
@@ -542,12 +546,12 @@
 
                 <h4 class="pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Ride versions and changes</h4>
                 <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
-                    <span class="font-medium text-slate-200">Count same-track experience changes (VR, enclosure)</span>
+                    <span class="font-medium text-slate-200">Count experience-only changes (track / elements unchanged)</span>
                     <input type="checkbox" id="rule-experience-change" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
                 </label>
 
                 <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
-                    <span class="font-medium text-slate-200">Count track / element changes (rebuild, launch, elements)</span>
+                    <span class="font-medium text-slate-200">Count reimagined versions (track, elements, or major ride changes)</span>
                     <input type="checkbox" id="rule-element-change" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
                 </label>
 

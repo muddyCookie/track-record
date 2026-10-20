@@ -20,6 +20,12 @@
         let authStateSubscription = null;
         let cloudDataSubscription = null;
 
+        const MINOR_RIDE_NAME_ALIASES = [
+            { canonical: 'X2', names: ['X', 'X2'] },
+            { canonical: 'Wilderness Run', names: ['Jr. Gemini', 'Wilderness Run'] },
+            { canonical: 'Iron Dragon', names: ['Iron Dragon', 'Iron Dragon VR'] }
+        ];
+
         // Credit Calculation Rules Defaults
         const DEFAULT_CREDIT_RULES = {
             powered: true,
@@ -375,29 +381,58 @@
 
         function normalizeRideVariant(variant = 'Original') {
             if (!variant) return 'Original';
-            if (['VR', 'Indoor'].includes(variant)) return 'ExperienceChange';
+            if (variant === 'VR') return 'Original';
+            if (variant === 'Indoor') return 'ExperienceChange';
             if (['Overhaul', 'DriveChange'].includes(variant)) return 'ElementChange';
             if (variant === 'Defunct') return 'Original';
             return variant;
         }
 
+        function canonicalRideName(name = '') {
+            const normalizedName = name.toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
+            if (normalizedName.endsWith('vr')) return name.replace(/\s*vr$/i, '').trim();
+            const alias = MINOR_RIDE_NAME_ALIASES.find(item =>
+                item.names.some(aliasName => aliasName.toLocaleLowerCase().replace(/[^a-z0-9]/g, '') === normalizedName)
+            );
+            return alias?.canonical || name;
+        }
+
+        function isMinorRideNameAlias(name = '') {
+            const normalizedName = name.toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
+            if (normalizedName.endsWith('vr')) return true;
+            return MINOR_RIDE_NAME_ALIASES.some(item =>
+                item.names.some(aliasName => aliasName.toLocaleLowerCase().replace(/[^a-z0-9]/g, '') === normalizedName)
+            );
+        }
+
+        function rideEntryVariant(entry) {
+            const variant = normalizeRideVariant(entry.variant);
+            return isMinorRideNameAlias(entry.coasterName || entry.coasterNameRidden) && variant !== 'Relocated'
+                ? 'Original'
+                : variant;
+        }
+
         function rideVariantLabel(variant) {
             const labels = {
                 ExperienceChange: 'Experience Change',
-                ElementChange: 'Element Change',
+                ElementChange: 'Reimagined',
                 Relocated: 'Relocated',
-                Defunct: 'Defunct / Retracked'
+                Defunct: 'Defunct / Retracked',
+                ReviewChange: 'Needs review'
             };
             const normalizedVariant = normalizeRideVariant(variant);
             return labels[normalizedVariant] || normalizedVariant;
         }
 
         function rideIdentityKey(entry) {
+            const coasterName = entry.coasterName || entry.coasterNameRidden || '';
+            const isMinorAlias = isMinorRideNameAlias(coasterName);
             return JSON.stringify([
                 (entry.parkName || entry.parkNameRidden || '').trim().toLocaleLowerCase(),
-                (entry.coasterName || entry.coasterNameRidden || '').trim().toLocaleLowerCase(),
+                canonicalRideName(coasterName).trim().toLocaleLowerCase(),
                 entry.type || 'Real',
-                normalizeRideVariant(entry.variant)
+                rideEntryVariant(entry),
+                isMinorAlias ? '' : entry.coasterpediaRideId || ''
             ]);
         }
 
@@ -419,21 +454,31 @@
             const duplicateKeys = new Set();
             const groupsByName = new Map();
             groups.forEach(group => {
-                const name = (group.entry.coasterName || group.entry.coasterNameRidden || '').trim().toLocaleLowerCase();
+                const name = canonicalRideName((group.entry.coasterName || group.entry.coasterNameRidden || '').trim()).toLocaleLowerCase();
                 if (!name) {
-                    if (normalizeRideVariant(group.entry.variant) === 'Relocated') duplicateKeys.add(group.key);
+                    if (rideEntryVariant(group.entry) === 'Relocated') duplicateKeys.add(group.key);
                     return;
                 }
                 if (!groupsByName.has(name)) groupsByName.set(name, []);
                 groupsByName.get(name).push(group);
             });
             groupsByName.forEach(nameGroups => {
-                const relocatedGroups = nameGroups.filter(group => normalizeRideVariant(group.entry.variant) === 'Relocated');
+                const relocatedGroups = nameGroups.filter(group => rideEntryVariant(group.entry) === 'Relocated');
                 relocatedGroups.forEach(group => duplicateKeys.add(group.key));
                 const distinctParks = new Set(nameGroups
                     .map(group => (group.entry.parkName || group.entry.parkNameRidden || '').trim().toLocaleLowerCase())
                     .filter(Boolean));
-                const duplicateCount = Math.max(relocatedGroups.length, distinctParks.size - 1);
+                const rideIdsByPark = new Map();
+                nameGroups.forEach(group => {
+                    const rideId = group.entry.coasterpediaRideId;
+                    const parkKey = (group.entry.parkName || group.entry.parkNameRidden || '').trim().toLocaleLowerCase();
+                    if (!rideId || !parkKey) return;
+                    if (!rideIdsByPark.has(parkKey)) rideIdsByPark.set(parkKey, new Set());
+                    rideIdsByPark.get(parkKey).add(rideId);
+                });
+                const sameParkDistinctRides = [...rideIdsByPark.values()]
+                    .reduce((count, rideIds) => count + Math.max(0, rideIds.size - 1), 0);
+                const duplicateCount = Math.max(relocatedGroups.length, distinctParks.size - 1) + sameParkDistinctRides;
                 let selectedCount = relocatedGroups.length;
                 for (const group of nameGroups) {
                     if (selectedCount >= duplicateCount) break;
@@ -462,7 +507,7 @@
             groups.forEach(group => {
                 const entry = group.entry;
                 const type = entry.type || 'Real';
-                const variant = normalizeRideVariant(entry.variant);
+                const variant = rideEntryVariant(entry);
                 if (group.rideCount > 1) relogCount++;
 
                 // Count unique park names (prefer official, fallback to ridden name)
@@ -492,6 +537,7 @@
                 if (variant === 'ExperienceChange' && !creditRules.experienceChange) isCredit = false;
                 if (variant === 'ElementChange' && !creditRules.elementChange) isCredit = false;
                 if (variant === 'Relocated' && !creditRules.relocated) isCredit = false;
+                if (variant === 'ReviewChange') isCredit = false;
 
                 if (isCredit) {
                     calculatedTotal += creditRules.countRelogs ? group.rideCount : 1;
@@ -513,7 +559,7 @@
 
         function isEntryCredit(entry) {
             const type = entry.type || 'Real';
-            const variant = normalizeRideVariant(entry.variant);
+            const variant = rideEntryVariant(entry);
             let isCredit = type === 'Real' ||
                 (type === 'Powered' && creditRules.powered) ||
                 (type === 'Alpine' && creditRules.alpine) ||
@@ -522,6 +568,7 @@
             if (variant === 'ExperienceChange' && !creditRules.experienceChange) isCredit = false;
             if (variant === 'ElementChange' && !creditRules.elementChange) isCredit = false;
             if (variant === 'Relocated' && !creditRules.relocated) isCredit = false;
+            if (variant === 'ReviewChange') isCredit = false;
             return isCredit;
         }
 
@@ -534,7 +581,8 @@
                 (kind !== 'type' || activeDashboardFilter.value === value) &&
                 (kind !== 'ride' || (
                     activeDashboardFilter.value.park.toLowerCase() === value.park.toLowerCase() &&
-                    activeDashboardFilter.value.coaster.toLowerCase() === value.coaster.toLowerCase()
+                    activeDashboardFilter.value.coaster.toLowerCase() === value.coaster.toLowerCase() &&
+                    (activeDashboardFilter.value.rideId || '') === (value.rideId || '')
                 ));
             if (isSameFilter) {
                 activeDashboardFilter = null;
@@ -610,7 +658,7 @@
                     </summary>
                     <div class="border-t border-bordercolor divide-y divide-bordercolor/70">
                         ${park.entries.slice().sort((a, b) => (a.entry.coasterName || '').localeCompare(b.entry.coasterName || '')).map(group => `
-                            <button type="button" data-park="${escapeHtml(park.name)}" data-coaster="${escapeHtml(group.entry.coasterName || '')}" onclick="applyDashboardFilter('ride', {park: this.dataset.park, coaster: this.dataset.coaster})" class="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-xs hover:bg-slate-800">
+                            <button type="button" data-park="${escapeHtml(park.name)}" data-coaster="${escapeHtml(group.entry.coasterName || '')}" data-ride-id="${escapeHtml(group.entry.coasterpediaRideId || '')}" onclick="applyDashboardFilter('ride', {park: this.dataset.park, coaster: this.dataset.coaster, rideId: this.dataset.rideId})" class="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-xs hover:bg-slate-800">
                                 <span class="text-slate-200">${escapeHtml(group.entry.coasterName || 'Unnamed coaster')}${group.rideCount > 1 ? ` · ${group.rideCount} laps` : ''}</span>
                                 <span class="text-slate-500">${escapeHtml(group.entry.rideStatus || 'Status unknown')}</span>
                             </button>
@@ -644,7 +692,9 @@
                     (activeDashboardFilter.kind === 'credits' && isEntryCredit(entry)) ||
                     (activeDashboardFilter.kind === 'ride' &&
                         (entry.parkName || entry.parkNameRidden || '').toLowerCase() === activeDashboardFilter.value.park.toLowerCase() &&
-                        (entry.coasterName || '').toLowerCase() === activeDashboardFilter.value.coaster.toLowerCase());
+                        (entry.coasterName || '').toLowerCase() === activeDashboardFilter.value.coaster.toLowerCase() &&
+                        (!activeDashboardFilter.value.rideId ||
+                            entry.coasterpediaRideId === activeDashboardFilter.value.rideId));
                 return matchSearch && matchDashboardFilter;
             });
 
@@ -694,6 +744,13 @@
                     : entry.coasterName;
                 
                 const showCoasterBadge = entry.coasterNameRidden && entry.coasterNameRidden !== entry.coasterName;
+                const historicalLogNames = [...new Set(group.entries
+                    .map(item => item.coasterNameRidden || item.coasterName)
+                    .filter(name => name && name !== entry.coasterName))];
+                const openingEntry = group.entries.find(item => item.coasterpediaOpeningDate || item.coasterpediaClosingDate);
+                const operatingDates = [openingEntry?.coasterpediaOpeningDate, openingEntry?.coasterpediaClosingDate]
+                    .filter(Boolean)
+                    .join('–');
 
                 const parkDisplayName = entry.parkNameRidden && entry.parkNameRidden !== entry.parkName 
                     ? entry.parkNameRidden 
@@ -708,10 +765,14 @@
                             <div class="flex items-center gap-2 flex-wrap">
                                 <h4 class="text-base font-bold text-white">${escapeHtml(coasterDisplayName)}</h4>
                                 ${showCoasterBadge ? `<span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-bordercolor" title="Current Official Name">Now: ${escapeHtml(entry.coasterName)}</span>` : ''}
+                                ${rideEntryVariant(entry) === 'ReviewChange' ? '<span class="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300">Needs review</span>' : ''}
                             </div>
+                            ${historicalLogNames.length ? `<p class="text-[11px] text-slate-500">Previously logged as ${historicalLogNames.map(escapeHtml).join(', ')}</p>` : ''}
+                            ${rideEntryVariant(entry) === 'ReviewChange' ? '<p class="text-[11px] text-amber-400">Edit this entry and choose Original or Reimagined to include it in Total.</p>' : ''}
                             <div class="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
                                 ${rideDateTime ? `<span><i class="fa-regular fa-calendar mr-1"></i>${escapeHtml(rideDateTime)}</span>` : ''}
                                 <span class="rounded-md border border-slate-700 px-2 py-0.5 text-[10px] uppercase tracking-wide">${escapeHtml(rideStatus)}</span>
+                                ${operatingDates ? `<span class="text-slate-500">Dates ${escapeHtml(operatingDates)}</span>` : ''}
                                 <span class="font-medium text-slate-200"><i class="fa-solid fa-location-dot text-brand-500 mr-1"></i>${escapeHtml(parkDisplayName)}</span>
                                 ${group.rideCount > 1 ? `<span><i class="fa-solid fa-ticket mr-1"></i>${group.rideCount} laps</span>` : ''}
                             </div>
@@ -1207,6 +1268,7 @@
                     ) || '');
                     rides.push({
                         id: pageTitle,
+                        sourceRideId: pageTitle,
                         name,
                         pageTitle,
                         entityType: `${rideStatus} coaster`,
@@ -1265,7 +1327,6 @@
             const redirectData = await redirectResponse.json();
             const pagesWithRedirects = Object.values(redirectData.query?.pages || {})
                 .filter(page => page.redirects?.length);
-            if (pagesWithRedirects.length === 0) return;
 
             const articlesByTitle = new Map();
             for (let offset = 0; offset < pageTitles.length; offset += 50) {
@@ -1285,7 +1346,10 @@
                 const articleData = await articleResponse.json();
                 Object.values(articleData.query?.pages || []).forEach(page => {
                     const wikitext = page.revisions?.[0]?.slots?.main?.['*'] || '';
-                    articlesByTitle.set(page.title.toLowerCase(), extractCoasterpediaInfoboxDetails(wikitext));
+                    articlesByTitle.set(
+                        page.title.toLowerCase(),
+                        extractCoasterpediaInfoboxDetails(wikitext, currentParkRides[0]?.parkName || '')
+                    );
                 });
             }
 
@@ -1293,7 +1357,32 @@
             const knownNames = new Set(currentParkRides.map(ride => ride.name.toLowerCase()));
             currentParkRides.forEach(ride => {
                 const details = articlesByTitle.get(ride.pageTitle.toLowerCase());
-                if (!details || details.tracks < 2) return;
+                if (!details) return;
+                ride.openingDate = details.openingDate;
+                ride.closingDate = details.closingDate;
+                ride.changeClassification = details.changeClassification;
+                ride.nameHistory = details.nameHistory;
+                const currentNameVersion = details.nameHistory.find(item =>
+                    item.name.toLocaleLowerCase() === details.currentName.toLocaleLowerCase()
+                );
+                ride.changeYear = details.changeClassification === 'reimagined'
+                    ? currentNameVersion?.from || details.changeYear
+                    : details.changeYear;
+                ride.hasReimaginedVersion = details.hasReimaginedVersion;
+                const currentNameIndex = details.nameHistory.findIndex(item =>
+                    item.name.toLocaleLowerCase() === details.currentName.toLocaleLowerCase()
+                );
+                const listedNameIndex = details.nameHistory.findIndex(item =>
+                    item.name.toLocaleLowerCase() === ride.name.toLocaleLowerCase()
+                );
+                if (details.changeClassification === 'reimagined' &&
+                    details.nameHistory.length > 1 &&
+                    listedNameIndex === currentNameIndex) {
+                    ride.variant = 'ElementChange';
+                } else if (details.changeClassification === 'uncertain' && details.nameHistory.length > 1) {
+                    ride.variant = 'ReviewChange';
+                }
+                if (details.tracks < 2) return;
                 ride.trackCount = details.tracks;
                 ride.trackNames = details.tracks === 2 && ride.name.toLowerCase() === 'gemini'
                     ? ['Red Track', 'Blue Track']
@@ -1315,28 +1404,50 @@
                     const nameKey = name.toLowerCase();
                     if (knownNames.has(nameKey)) return;
                     knownNames.add(nameKey);
-                    if (isNameOnlyRideChange(ride.name, name)) {
+                    const details = articlesByTitle.get(page.title.toLowerCase());
+                    const changeClassification = details?.changeClassification || 'uncertain';
+                    if (isNameOnlyRideChange(ride.name, name) || changeClassification === 'minor') {
                         ride.historicalNames = [...(ride.historicalNames || []), name];
                         return;
+                    }
+                    const formerNameIndex = details?.nameHistory?.findIndex(item =>
+                        item.name.toLocaleLowerCase() === name.toLocaleLowerCase()
+                    ) ?? -1;
+                    const currentNameIndex = details?.nameHistory?.findIndex(item =>
+                        item.name.toLocaleLowerCase() === details.currentName?.toLocaleLowerCase()
+                    ) ?? -1;
+                    let variant = changeClassification === 'reimagined'
+                        ? (formerNameIndex >= 0 && currentNameIndex >= 0 && formerNameIndex < currentNameIndex
+                            ? 'Original'
+                            : 'ElementChange')
+                        : 'ReviewChange';
+                    if (changeClassification === 'reimagined' &&
+                        ride.name.toLocaleLowerCase() === details.currentName?.toLocaleLowerCase()) {
+                        ride.variant = 'ElementChange';
                     }
                     currentParkRides.push({
                         id: `${ride.id}::${name}`,
                         name,
                         pageTitle: ride.pageTitle,
+                        sourceRideId: ride.sourceRideId,
+                        openingDate: ride.openingDate,
+                        closingDate: ride.closingDate,
                         entityType: 'Former coaster',
                         parkName: ride.parkName,
                         type: ride.type,
                         rideType: ride.rideType,
-                        variant: 'ElementChange'
+                        variant
                     });
                 });
             });
 
+            collapseMinorRideAliases();
             currentParkRides = currentParkRides.flatMap(ride => {
                 if (!ride.trackNames) return [ride];
                 return ride.trackNames.map((trackName, index) => ({
                     ...ride,
                     id: `${ride.id}::track-${index + 1}`,
+                    sourceRideId: `${ride.sourceRideId}::track-${index + 1}`,
                     name: `${ride.name} (${trackName})`,
                     trackIndex: index + 1,
                     trackNames: undefined
@@ -1344,27 +1455,159 @@
             });
         }
 
-        function isNameOnlyRideChange(currentName, formerName) {
-            const normalizedCurrentName = currentName.toLowerCase().replace(/[^a-z0-9]/g, '');
-            const normalizedFormerName = formerName.toLowerCase().replace(/[^a-z0-9]/g, '');
-            return normalizedCurrentName === 'x2' && normalizedFormerName === 'x';
+        function collapseMinorRideAliases() {
+            MINOR_RIDE_NAME_ALIASES.forEach(({ canonical: currentName, names }) => {
+                const formerName = names.find(name =>
+                    name.toLocaleLowerCase() !== currentName.toLocaleLowerCase()
+                );
+                const matchingRides = currentParkRides.filter(ride =>
+                    [currentName, formerName].some(name =>
+                        ride.name.toLocaleLowerCase() === name.toLocaleLowerCase()
+                    )
+                );
+                const canonicalRide = matchingRides.find(ride =>
+                    ride.name.toLocaleLowerCase() === currentName.toLocaleLowerCase() &&
+                    ride.entityType === 'Present coaster'
+                ) || matchingRides.find(ride =>
+                    ride.name.toLocaleLowerCase() === currentName.toLocaleLowerCase()
+                );
+                if (!canonicalRide || matchingRides.length < 2) return;
+
+                canonicalRide.historicalNames = [...new Set([
+                    ...(canonicalRide.historicalNames || []),
+                    formerName,
+                    ...matchingRides
+                        .filter(ride => ride !== canonicalRide)
+                        .flatMap(ride => ride.historicalNames || [])
+                ])];
+                currentParkRides = currentParkRides.filter(ride =>
+                    !matchingRides.includes(ride) || ride === canonicalRide
+                );
+            });
+
+            currentParkRides.slice().forEach(vrRide => {
+                if (!/vr$/i.test(vrRide.name)) return;
+                const currentName = vrRide.name.replace(/\s*vr$/i, '').trim();
+                const canonicalRide = currentParkRides.find(ride =>
+                    ride.name.toLocaleLowerCase() === currentName.toLocaleLowerCase() &&
+                    ride.entityType === 'Present coaster'
+                );
+                if (!canonicalRide) return;
+                canonicalRide.historicalNames = [...new Set([
+                    ...(canonicalRide.historicalNames || []),
+                    vrRide.name
+                ])];
+                currentParkRides = currentParkRides.filter(ride => ride !== vrRide);
+            });
         }
 
-        function extractCoasterpediaInfoboxDetails(wikitext) {
+        function isNameOnlyRideChange(currentName, formerName) {
+            const normalize = name => name.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const current = normalize(currentName);
+            const former = normalize(formerName);
+            return current === former || current === `${former}vr` || former === `${current}vr` ||
+                MINOR_RIDE_NAME_ALIASES.some(item => {
+                    const names = item.names.map(normalize);
+                    return names.includes(current) && names.includes(former);
+                });
+        }
+
+        function extractCoasterpediaInfoboxDetails(wikitext, selectedParkName = '') {
             const infobox = wikitext.match(/\{\{Infobox roller coaster\b([\s\S]*?)^\}\}/im)?.[1] || '';
-            const names = [...infobox.matchAll(/^\|name\d*\s*=\s*(.+)$/gim)]
-                .map(match => match[1]
-                    .replace(/<!--[\s\S]*?-->/g, '')
-                    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, title, label) => label || title)
-                    .replace(/<[^>]*>/g, ' ')
-                    .replace(/'{2,}/g, '')
-                    .trim())
-                    .filter(Boolean);
+            const nameRows = [...infobox.matchAll(/^\|name(\d*)\s*=\s*(.+)$/gim)];
+            const hasFirstNumberedName = nameRows.some(match => match[1] === '1');
+            const nameHistory = nameRows.map(match => {
+                const index = Number(match[1] || 0);
+                const historyIndex = index === 0 && !hasFirstNumberedName ? 1 : index;
+                return {
+                    index,
+                    name: cleanCoasterpediaCell(match[2]),
+                    from: cleanCoasterpediaCell(infobox.match(new RegExp(`^\\|name${historyIndex}From\\s*=\\s*(.+)$`, 'im'))?.[1] || ''),
+                    to: cleanCoasterpediaCell(infobox.match(new RegExp(`^\\|name${historyIndex}To\\s*=\\s*(.+)$`, 'im'))?.[1] || '')
+                };
+            }).filter(item => item.name);
+            const names = nameHistory.map(item => item.name);
             const trackCount = infobox.match(/^\|tracks?\s*=\s*(\d+)/im);
+            const pastInfoboxes = [...wikitext.matchAll(/\{\{infobox past\b([\s\S]*?)^\}\}/gim)]
+                .map(match => match[1]);
+            const parkNameKey = selectedParkName.toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
+            const mainPark = cleanCoasterpediaCell(infobox.match(/^\|park\s*=\s*(.+)$/im)?.[1] || '');
+            const mainParkKey = mainPark.toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
+            const pastParkInfobox = parkNameKey && mainParkKey !== parkNameKey
+                ? pastInfoboxes.find(pastInfobox => {
+                    const pastPark = cleanCoasterpediaCell(pastInfobox.match(/^\|park\s*=\s*(.+)$/im)?.[1] || '');
+                    return pastPark.toLocaleLowerCase().replace(/[^a-z0-9]/g, '') === parkNameKey;
+                })
+                : null;
+            const dateInfobox = pastParkInfobox || (
+                parkNameKey && mainParkKey && mainParkKey !== parkNameKey ? '' : infobox
+            );
+            const currentName = nameHistory.find(item => /present|current/i.test(item.to))?.name ||
+                nameHistory.at(-1)?.name ||
+                '';
+            const changeClassification = classifyCoasterpediaChange(wikitext, infobox, nameHistory);
+            const changeEvidence = wikitext.split(/[.!?\n]/)
+                .find(sentence => isStructuralRideChange(sentence.toLowerCase()) ||
+                    isMajorRideTransformation(sentence.toLowerCase())) || '';
+            const currentVersionStart = nameHistory.find(item => item.name === currentName)?.from || '';
             return {
-                    names: new Set(names),
-                tracks: trackCount ? Number(trackCount[1]) : 1
+                names: new Set(names),
+                nameHistory,
+                currentName,
+                tracks: trackCount ? Number(trackCount[1]) : 1,
+                openingDate: parseCoasterpediaDate(dateInfobox.match(/^\|opened\s*=\s*(.+)$/im)?.[1] || ''),
+                closingDate: parseCoasterpediaDate(dateInfobox.match(/^\|closed\s*=\s*(.+)$/im)?.[1] || ''),
+                changeClassification,
+                changeYear: changeClassification === 'reimagined'
+                    ? currentVersionStart.match(/\b(?:18|19|20)\d{2}\b/)?.[0] ||
+                        changeEvidence.match(/\b(?:18|19|20)\d{2}\b/)?.[0] ||
+                        ''
+                    : '',
+                hasReimaginedVersion: changeClassification === 'reimagined' && nameHistory.length < 2
             };
+        }
+
+        function classifyCoasterpediaChange(wikitext, infobox, nameHistory) {
+            const normalizedText = wikitext.toLocaleLowerCase();
+            const majorSpecFields = ['manufacturer', 'product', 'track_material', 'category1', 'category2', 'lift/launch'];
+            const specificationChange = majorSpecFields.some(field => {
+                const value = infobox.match(new RegExp(`^\\|${field.replace('/', '\\/')}\\s*=\\s*(.+)$`, 'im'))?.[1] || '';
+                return /originally|\b(?:19|20)\d{2}\s*[-–]\s*(?:19|20)\d{2}\b/i.test(value) ||
+                    (/<br\s*\/?\s*>/i.test(value) && /\[\[[^\]]+\]\]/.test(value));
+            });
+            if (normalizedText.split(/[.!?\n]/).some(sentence =>
+                isStructuralRideChange(sentence) || isMajorRideTransformation(sentence)
+            ) ||
+                (specificationChange && nameHistory.length > 1)) {
+                return 'reimagined';
+            }
+            if (/\b(?:renamed|name changed|new name|repainted|new colour scheme|new color scheme|new trains?|train was replaced|virtual reality overlay|vr overlay)\b/i.test(normalizedText)) {
+                return 'minor';
+            }
+            return nameHistory.length > 1 ? 'uncertain' : 'none';
+        }
+
+        function isStructuralRideChange(sentence) {
+            const structuralNoun = '(?:layout|track|elements?|drop|lift|launch|loop|inversion|course|coaster type)';
+            const changeVerb = '(?:chang(?:e|ed|es|ing)|modif(?:y|ied|ies|ication)|replac(?:e|ed|es|ing)|remov(?:e|ed|es|ing)|add(?:ed|s|ing)|convert(?:ed|s|ing)|retrack(?:ed|s|ing)|reprofil(?:ed|e|ing))';
+            return new RegExp(`\\b${structuralNoun}\\b(?:(?!\\bnot\\b)[^.!?\\n]){0,180}\\b${changeVerb}\\b`, 'i').test(sentence) ||
+                new RegExp(`\\b${changeVerb}\\b(?:(?!\\bnot\\b)[^.!?\\n]){0,180}\\b${structuralNoun}\\b`, 'i').test(sentence) ||
+                /\bconverted?\s+(?:from\b.{0,80}\bto\b|into\b.{0,60}\b(?:floorless|stand.?up|sit.?down|inverted|launched|wooden|steel))\b/i.test(sentence);
+        }
+
+        function isMajorRideTransformation(sentence) {
+            return /\b(?:completely|fully)\s+enclos(?:ed|ing)\b/i.test(sentence) ||
+                /\b(?:enclos(?:ed|ing)|rethem(?:ed|ing))\b[^.!?\n]{0,100}\b(?:ride|coaster|building|show|theme)\b/i.test(sentence) ||
+                /\b(?:major|complete|extensive)\s+(?:refurbishment|renovation|overhaul|transformation)\b/i.test(sentence);
+        }
+
+        function parseCoasterpediaDate(value) {
+            const dateText = cleanCoasterpediaCell(value).replace(/\s+/g, ' ').trim();
+            const exactDate = dateText.match(/\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+(?:18|19|20)\d{2}\b/i);
+            return exactDate?.[0] ||
+                dateText.match(/\b(?:18|19|20)\d{2}-\d{2}-\d{2}\b/)?.[0] ||
+                dateText.match(/\b(?:18|19|20)\d{2}\b/)?.[0] ||
+                '';
         }
 
         function renderRidesList() {
@@ -1372,6 +1615,12 @@
             const searchVal = document.getElementById('ride-search-filter').value.toLowerCase().trim();
 
             const filtered = currentParkRides.filter(r => r.name.toLowerCase().includes(searchVal));
+            const distinctRideIdsByName = new Map();
+            currentParkRides.forEach(ride => {
+                const nameKey = ride.name.toLocaleLowerCase();
+                if (!distinctRideIdsByName.has(nameKey)) distinctRideIdsByName.set(nameKey, new Set());
+                distinctRideIdsByName.get(nameKey).add(ride.sourceRideId || ride.id);
+            });
 
             if (filtered.length === 0) {
                 grid.innerHTML = `<div class="col-span-full text-center py-8 text-xs text-slate-500">No attractions found matching filter.</div>`;
@@ -1397,15 +1646,44 @@
                 section.rides.forEach(ride => {
                     const searchableRideNames = [ride.name, ...(ride.historicalNames || [])]
                         .map(name => name.toLocaleLowerCase());
-                    const loggedEntry = coasterLog.find(l =>
-                        (l.parkName || l.parkNameRidden || '').toLocaleLowerCase() === ride.parkName.toLocaleLowerCase() &&
-                        [l.coasterName, l.coasterNameRidden]
+                    const rideSourceId = ride.sourceRideId || ride.id;
+                    const sameNameRideCount = distinctRideIdsByName.get(ride.name.toLocaleLowerCase())?.size || 1;
+                    const matchingParkEntries = coasterLog.filter(entry =>
+                        (entry.parkName || entry.parkNameRidden || '').toLocaleLowerCase() === ride.parkName.toLocaleLowerCase() &&
+                        [entry.coasterName, entry.coasterNameRidden]
                             .filter(Boolean)
                             .some(name => searchableRideNames.includes(name.toLocaleLowerCase()))
+                    );
+                    const loggedEntry = matchingParkEntries.find(entry =>
+                        entry.coasterpediaRideId === rideSourceId &&
+                        rideEntryVariant(entry) === normalizeRideVariant(ride.variant)
+                    ) || (sameNameRideCount === 1
+                        ? matchingParkEntries.find(entry =>
+                            !entry.coasterpediaRideId &&
+                            rideEntryVariant(entry) === normalizeRideVariant(ride.variant)
+                        )
+                        : null);
+                    const reimaginedEntry = matchingParkEntries.find(entry =>
+                        entry.coasterpediaRideId === rideSourceId &&
+                        rideEntryVariant(entry) === 'ElementChange'
                     );
                     const articleUrl = `https://coasterpedia.net/wiki/${encodeURIComponent(ride.pageTitle.replace(/ /g, '_'))}`;
                     const rideType = ride.rideType || classifyRideLabel(ride.type || '');
                     const variant = normalizeRideVariant(ride.variant);
+                    const disambiguatingOpeningDate = sameNameRideCount > 1 ? ride.openingDate || '' : '';
+                    const disambiguatingClosingDate = sameNameRideCount > 1 ? ride.closingDate || '' : '';
+                    const disambiguatingDateLabel = [disambiguatingOpeningDate, disambiguatingClosingDate].filter(Boolean).join('–');
+                    const dateLabel = disambiguatingDateLabel
+                        ? `<p class="mt-1 text-[11px] text-slate-500">Dates ${escapeHtml(disambiguatingDateLabel)}</p>`
+                        : '';
+                    const reviewNotice = variant === 'ReviewChange'
+                        ? '<p class="mt-1 text-[11px] text-amber-400">Ride history is unclear. Choose the correct version in the log form; this entry will not count toward Total until resolved.</p>'
+                        : '';
+                    const reimaginedAction = ride.hasReimaginedVersion
+                        ? (reimaginedEntry
+                            ? `<button data-entry-id="${escapeHtml(reimaginedEntry.id)}" data-current-name="${escapeHtml(ride.name)}" data-status="${ride.entityType.startsWith('Former') ? 'Former' : 'Present'}" data-ride-type="${ride.type || 'Real'}" data-ride-id="${escapeHtml(rideSourceId)}" onclick="relogEntry(this.dataset.entryId, {name: this.dataset.currentName, status: this.dataset.status, type: this.dataset.rideType, variant: 'ElementChange', rideId: this.dataset.rideId})" class="rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-[11px] font-semibold text-violet-300 transition hover:bg-violet-500/20"><i class="fa-solid fa-rotate mr-1"></i>Relog Reimagined</button>`
+                            : `<button data-park-name="${escapeHtml(ride.parkName)}" data-ride-name="${escapeHtml(ride.name)}" data-ride-type="${ride.type || 'Real'}" data-status="${ride.entityType.startsWith('Former') ? 'Former' : 'Present'}" data-ride-id="${escapeHtml(rideSourceId)}" onclick="quickLogRide(this.dataset.parkName, this.dataset.rideName, 'ElementChange', this.dataset.rideType, this.dataset.status, this.dataset.rideId)" class="rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-[11px] font-semibold text-violet-300 transition hover:bg-violet-500/20"><i class="fa-solid fa-plus mr-1"></i>Log Reimagined</button>`)
+                        : '';
 
                     html += `
                         <div class="flex flex-col gap-2 px-4 py-3 transition hover:bg-slate-800/40 sm:flex-row sm:items-center sm:justify-between">
@@ -1415,13 +1693,24 @@
                                     <span class="rounded-md border border-brand-500/20 bg-brand-500/10 px-2 py-0.5 text-[10px] font-semibold text-brand-300">${escapeHtml(rideType)}</span>
                                 </div>
                                 ${ride.historicalNames?.length ? `<p class="mt-1 text-[11px] text-slate-500">Also known as ${ride.historicalNames.map(escapeHtml).join(', ')}</p>` : ''}
+                                ${variant !== 'Original' ? `<span class="mt-1 inline-block rounded-md border border-violet-500/20 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold text-violet-300">${escapeHtml(rideVariantLabel(variant))}</span>` : ''}
+                                ${reviewNotice}
+                                ${ride.hasReimaginedVersion ? `<p class="mt-1 text-[11px] text-violet-300">Coasterpedia documents a track or element change${ride.changeYear ? ` in ${escapeHtml(ride.changeYear)}` : ''}; the reimagined version can be logged separately.</p>` : ''}
+                                ${dateLabel}
+                                ${sameNameRideCount > 1 && matchingParkEntries.some(entry => !entry.coasterpediaRideId)
+                                    ? '<p class="mt-1 text-[10px] text-amber-400">Older same-name logs are not assigned to a specific ride. New logs will be distinguished automatically.</p>'
+                                    : ''}
                             </div>
                             ${loggedEntry
                                 ? `<div class="flex gap-2 self-end sm:self-auto">
-                                    <button data-entry-id="${escapeHtml(loggedEntry.id)}" data-current-name="${escapeHtml(ride.name)}" data-status="${ride.entityType.startsWith('Former') ? 'Former' : 'Present'}" data-ride-type="${ride.type || 'Real'}" data-variant="${variant}" onclick="relogEntry(this.dataset.entryId, {name: this.dataset.currentName, status: this.dataset.status, type: this.dataset.rideType, variant: this.dataset.variant})" class="rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-1.5 text-[11px] font-semibold text-brand-300 transition hover:bg-brand-500/20"><i class="fa-solid fa-rotate mr-1"></i>Relog</button>
+                                    <button data-entry-id="${escapeHtml(loggedEntry.id)}" data-current-name="${escapeHtml(ride.name)}" data-status="${ride.entityType.startsWith('Former') ? 'Former' : 'Present'}" data-ride-type="${ride.type || 'Real'}" data-variant="${variant}" data-ride-id="${escapeHtml(rideSourceId)}" data-opening-date="${escapeHtml(disambiguatingOpeningDate)}" data-closing-date="${escapeHtml(disambiguatingClosingDate)}" onclick="relogEntry(this.dataset.entryId, {name: this.dataset.currentName, status: this.dataset.status, type: this.dataset.rideType, variant: this.dataset.variant, rideId: this.dataset.rideId, openingDate: this.dataset.openingDate, closingDate: this.dataset.closingDate})" class="rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-1.5 text-[11px] font-semibold text-brand-300 transition hover:bg-brand-500/20"><i class="fa-solid fa-rotate mr-1"></i>Relog</button>
                                     <button data-entry-id="${escapeHtml(loggedEntry.id)}" data-current-name="${escapeHtml(ride.name)}" onclick="openRideEntryEdit(this.dataset.entryId, this.dataset.currentName)" class="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[11px] font-semibold text-rose-300 transition hover:bg-rose-500/20"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
+                                    ${reimaginedAction}
                                 </div>`
-                                : `<button data-park-name="${escapeHtml(ride.parkName)}" data-ride-name="${escapeHtml(ride.name)}" data-ride-type="${ride.type || 'Real'}" data-variant="${variant}" data-status="${ride.entityType.startsWith('Former') ? 'Former' : 'Present'}" onclick="quickLogRide(this.dataset.parkName, this.dataset.rideName, this.dataset.variant, this.dataset.rideType, this.dataset.status)" class="self-end rounded-lg bg-brand-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-brand-500 sm:self-auto"><i class="fa-solid fa-plus mr-1"></i>Log Coaster</button>`}
+                                : `<div class="flex flex-wrap gap-2 self-end sm:self-auto">
+                                    <button data-park-name="${escapeHtml(ride.parkName)}" data-ride-name="${escapeHtml(ride.name)}" data-ride-type="${ride.type || 'Real'}" data-variant="${variant}" data-status="${ride.entityType.startsWith('Former') ? 'Former' : 'Present'}" data-ride-id="${escapeHtml(rideSourceId)}" data-opening-date="${escapeHtml(disambiguatingOpeningDate)}" data-closing-date="${escapeHtml(disambiguatingClosingDate)}" onclick="quickLogRide(this.dataset.parkName, this.dataset.rideName, this.dataset.variant, this.dataset.rideType, this.dataset.status, this.dataset.rideId, this.dataset.openingDate, this.dataset.closingDate)" class="rounded-lg bg-brand-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-brand-500"><i class="fa-solid fa-plus mr-1"></i>Log Coaster</button>
+                                    ${reimaginedAction}
+                                </div>`}
                         </div>
                     `;
                 });
@@ -1436,7 +1725,7 @@
         }
 
         // Quick Log from Coasterpedia's park directory
-        function quickLogRide(parkName, rideName, variant = 'Original', type = 'Real', status = 'Unknown') {
+        function quickLogRide(parkName, rideName, variant = 'Original', type = 'Real', status = 'Unknown', rideId = '', openingDate = '', closingDate = '') {
             if (!openAddModal()) return;
             document.getElementById('form-park-name').value = parkName;
             document.getElementById('form-park-ridden').value = parkName;
@@ -1445,6 +1734,9 @@
             document.getElementById('form-coaster-type').value = type;
             document.getElementById('form-variant-type').value = normalizeRideVariant(variant);
             document.getElementById('form-ride-status').value = status;
+            document.getElementById('form-coasterpedia-ride-id').value = rideId;
+            document.getElementById('form-coasterpedia-opening-date').value = openingDate;
+            document.getElementById('form-coasterpedia-closing-date').value = closingDate;
         }
 
         // Modal Handlers & Form Actions
@@ -1452,6 +1744,9 @@
             if (!requireSignedIn()) return false;
             document.getElementById('modal-entry-title').innerHTML = `<i class="fa-solid fa-pen-to-square text-brand-500"></i> Add Log Entry`;
             document.getElementById('form-entry-id').value = '';
+            document.getElementById('form-coasterpedia-ride-id').value = '';
+            document.getElementById('form-coasterpedia-opening-date').value = '';
+            document.getElementById('form-coasterpedia-closing-date').value = '';
             document.getElementById('form-park-name').value = '';
             document.getElementById('form-park-ridden').value = '';
             document.getElementById('form-coaster-name').value = '';
@@ -1480,12 +1775,15 @@
 
             document.getElementById('modal-entry-title').innerHTML = `<i class="fa-solid fa-pen-to-square text-brand-500"></i> Edit Log Entry`;
             document.getElementById('form-entry-id').value = entry.id;
+            document.getElementById('form-coasterpedia-ride-id').value = entry.coasterpediaRideId || '';
+            document.getElementById('form-coasterpedia-opening-date').value = entry.coasterpediaOpeningDate || '';
+            document.getElementById('form-coasterpedia-closing-date').value = entry.coasterpediaClosingDate || '';
             document.getElementById('form-park-name').value = entry.parkName || '';
             document.getElementById('form-park-ridden').value = entry.parkNameRidden || entry.parkName || '';
             document.getElementById('form-coaster-name').value = entry.coasterName || '';
             document.getElementById('form-coaster-ridden').value = entry.coasterNameRidden || entry.coasterName || '';
             document.getElementById('form-coaster-type').value = entry.type || 'Real';
-            document.getElementById('form-variant-type').value = normalizeRideVariant(entry.variant);
+            document.getElementById('form-variant-type').value = rideEntryVariant(entry);
             document.getElementById('form-date-ridden').value = entry.dateRidden || '';
             document.getElementById('form-time-ridden').value = entry.timeRidden || '';
             document.getElementById('form-date-unknown').checked = entry.unknownDate === true;
@@ -1512,7 +1810,10 @@
                     coasterNameRidden: rideDetails.name,
                     rideStatus: rideDetails.status,
                     type: rideDetails.type,
-                    variant: normalizeRideVariant(rideDetails.variant)
+                    variant: normalizeRideVariant(rideDetails.variant),
+                    coasterpediaRideId: rideDetails.rideId || group.entry.coasterpediaRideId || '',
+                    coasterpediaOpeningDate: rideDetails.openingDate || group.entry.coasterpediaOpeningDate || '',
+                    coasterpediaClosingDate: rideDetails.closingDate || group.entry.coasterpediaClosingDate || ''
                 } : {}),
                 id: group.entry.id || 'entry_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
                 dateRidden: formatLocalDate(now),
@@ -1598,6 +1899,9 @@
             const rideStatus = document.getElementById('form-ride-status').value;
             const rideCount = parseInt(document.getElementById('form-ride-count').value) || 1;
             const notes = document.getElementById('form-notes').value.trim();
+            const coasterpediaRideId = document.getElementById('form-coasterpedia-ride-id').value;
+            const coasterpediaOpeningDate = document.getElementById('form-coasterpedia-opening-date').value;
+            const coasterpediaClosingDate = document.getElementById('form-coasterpedia-closing-date').value;
 
             if (id) {
                 // Edit existing
@@ -1610,6 +1914,9 @@
                         parkNameRidden,
                         coasterName,
                         coasterNameRidden,
+                        coasterpediaRideId,
+                        coasterpediaOpeningDate,
+                        coasterpediaClosingDate,
                         type,
                         variant,
                         dateRidden,
@@ -1634,6 +1941,9 @@
                     parkNameRidden,
                     coasterName,
                     coasterNameRidden,
+                    coasterpediaRideId,
+                    coasterpediaOpeningDate,
+                    coasterpediaClosingDate,
                     type,
                     variant,
                     dateRidden,

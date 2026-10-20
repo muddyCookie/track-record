@@ -441,7 +441,9 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Official Coaster Name *</label>
-                        <input type="text" id="form-coaster-name" oninput="updateRelogNameVariant()" required placeholder="e.g. Top Thrill 2" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <input type="text" id="form-coaster-name" list="form-coaster-name-options" oninput="updateRelogNameVariant()" onchange="updateRideClassificationFromName()" required placeholder="e.g. Top Thrill 2" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <datalist id="form-coaster-name-options"></datalist>
+                        <p class="mt-1 text-[10px] text-slate-500">Choose a listed name to set its ride type and version, or enter a custom name.</p>
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-400 mb-1">Coaster Name WHEN RIDDEN <span class="text-slate-500 font-normal">(Historic)</span></label>
@@ -466,9 +468,8 @@
                             <option value="Original">Original</option>
                             <option value="ElementChange">Reimagined / experience change</option>
                             <option value="Relocated">Relocated</option>
-                            <option value="ReviewChange">Needs review (not counted yet)</option>
                         </select>
-                        <p class="mt-1 text-[10px] text-slate-500">Use for a meaningful change to the ride experience, such as VR, outdoor-to-indoor, stand-up-to-floorless, a changed layout or elements, or wood-to-steel track. A new name or theme, new trains, paint, or routine retracking alone stays one credit. Unclear histories need review.</p>
+                        <p class="mt-1 text-[10px] text-slate-500">Use for a meaningful change to the ride experience, such as VR, outdoor-to-indoor, stand-up-to-floorless, a changed layout or elements, or wood-to-steel track. A new name or theme, new trains, paint, or routine retracking alone stays one credit.</p>
                     </div>
                 </div>
 

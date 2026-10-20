@@ -52,6 +52,62 @@
             border-color: rgba(var(--active-accent), 0.7) !important;
             box-shadow: 0 10px 24px rgba(var(--active-accent), 0.12);
         }
+        @media (max-width: 900px) {
+            #log-action-controls {
+                width: 100% !important;
+                flex-wrap: wrap;
+                justify-content: flex-end;
+            }
+        }
+        @media (max-width: 639px) {
+            body { overflow-x: hidden; }
+            header .max-w-7xl,
+            main.max-w-7xl { padding-left: .75rem; padding-right: .75rem; }
+            header .max-w-7xl > .flex { align-items: stretch; gap: .5rem; }
+            header .max-w-7xl > .flex > button:first-child { align-self: flex-start; }
+            header .max-w-7xl > .flex > .flex.flex-wrap.items-center.justify-end {
+                display: grid;
+                width: 100%;
+                grid-template-columns: 1fr 1fr;
+                justify-content: stretch;
+                gap: .5rem;
+            }
+            header #account-action,
+            header button[onclick="openSettingsModal()"] {
+                justify-content: center;
+                padding: .625rem .5rem;
+                border: 1px solid #334155;
+                border-radius: .75rem;
+                background: rgba(15, 23, 42, .55);
+            }
+            header .max-w-7xl > .flex > .flex.flex-wrap.items-center.justify-end > .flex.space-x-1 {
+                grid-column: 1 / -1;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                width: 100%;
+                margin: 0;
+            }
+            header .flex.space-x-1 > button { justify-content: center; margin-left: 0; }
+            main.max-w-7xl { padding-top: 1rem; padding-bottom: 1.5rem; }
+            #tab-log,
+            #tab-search { gap: 1rem; }
+            #tab-log > .flex:first-child { padding: .875rem; }
+            #tab-log > .flex:first-child p { line-height: 1.45; }
+            #dashboard-stats-grid { gap: .5rem; }
+            .dashboard-stat-card { min-height: 5rem; padding: .75rem; border-radius: .875rem; }
+            .dashboard-stat-card > div:first-child { font-size: .625rem; letter-spacing: .06em; }
+            #log-controls-bar { align-items: stretch; padding: .875rem; }
+            #log-controls-bar > div:first-child { flex-wrap: wrap; }
+            #log-action-controls { align-items: stretch; }
+            #log-action-controls select { min-height: 2.5rem; }
+            #log-list > .bg-cardbg { padding: 1.5rem 1rem; }
+            #rides-results-container,
+            #tab-search > .bg-cardbg { padding: 1rem; }
+            #rides-grid .bg-slate-900,
+            #rides-grid [class*="rounded-xl"] { max-width: 100%; }
+            input, select, textarea { font-size: 16px; }
+            #auth-form { padding: 1.25rem; }
+        }
     </style>
 </head>
 <body class="bg-darkbg text-slate-100 min-h-screen flex flex-col selection:bg-brand-500 selection:text-white">
@@ -162,7 +218,7 @@
             </div>
 
             <!-- Stats Grid Counters -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+            <div id="dashboard-stats-grid" class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
                 <!-- Roller -->
                 <button type="button" onclick="applyDashboardFilter('type','Real')" data-filter-kind="type" data-filter-value="Real" style="--active-accent: 16, 185, 129" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-emerald-500/50 transition">
                     <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Roller</div>
@@ -192,28 +248,35 @@
                 </button>
 
                 <!-- Duplicates -->
-                <button type="button" onclick="applyDashboardFilter('variants')" data-filter-kind="variants" style="--active-accent: 192, 132, 252" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-purple-500/50 transition">
+                <button type="button" onclick="applyDashboardFilter('duplicates')" data-filter-kind="duplicates" style="--active-accent: 192, 132, 252" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-purple-500/50 transition">
                     <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Duplicates</div>
                     <div id="stat-duplicates" class="text-2xl font-black text-purple-400">0</div>
                     <i class="fa-solid fa-copy absolute -right-2 -bottom-2 text-4xl text-purple-500/10 group-hover:text-purple-500/20 transition"></i>
                 </button>
 
-                <!-- Total Calculated Credits -->
-                <button type="button" onclick="applyDashboardFilter('credits')" data-filter-kind="credits" style="--active-accent: 16, 185, 129" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-brand-300 transition">
-                    <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Total Credits</div>
-                    <div id="stat-total" class="text-3xl font-black text-white">0</div>
-                    <i class="fa-solid fa-trophy absolute -right-2 -bottom-2 text-5xl text-brand-500/20 group-hover:text-brand-500/30 transition"></i>
+                <!-- Relogs -->
+                <button type="button" onclick="applyDashboardFilter('relogs')" data-filter-kind="relogs" style="--active-accent: 244, 114, 182" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-pink-500/50 transition">
+                    <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Relogs</div>
+                    <div id="stat-relogs" class="text-2xl font-black text-pink-400">0</div>
+                    <i class="fa-solid fa-rotate absolute -right-2 -bottom-2 text-4xl text-pink-500/10 group-hover:text-pink-500/20 transition"></i>
                 </button>
 
-                <!-- Parks Visited -->
+                <!-- Parks -->
                 <button type="button" onclick="toggleParkBreakdown()" data-filter-kind="parks" style="--active-accent: 129, 140, 248" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-indigo-500/50 transition">
-                    <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Parks Visited</div>
+                    <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Parks</div>
                     <div id="stat-parks" class="text-2xl font-black text-indigo-400">0</div>
                     <i class="fa-solid fa-map-location-dot absolute -right-2 -bottom-2 text-4xl text-indigo-500/10 group-hover:text-indigo-500/20 transition"></i>
                 </button>
+
+                <!-- Total -->
+                <button type="button" onclick="applyDashboardFilter('credits')" data-filter-kind="credits" style="--active-accent: 16, 185, 129" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-brand-300 transition">
+                    <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Total</div>
+                    <div id="stat-total" class="text-3xl font-black text-white">0</div>
+                    <i class="fa-solid fa-trophy absolute -right-2 -bottom-2 text-5xl text-brand-500/20 group-hover:text-brand-500/30 transition"></i>
+                </button>
             </div>
             <!-- Logbook Header & Search/Filter Controls -->
-            <div class="bg-cardbg rounded-2xl border border-bordercolor p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div id="log-controls-bar" class="bg-cardbg rounded-2xl border border-bordercolor p-4 flex flex-col md:flex-row items-center justify-between gap-4">
                 <div class="w-full md:w-auto flex items-center gap-3">
                     <h3 class="text-base font-bold text-white whitespace-nowrap flex items-center gap-2">
                         <i class="fa-solid fa-list-check text-slate-400"></i> My Coaster Log
@@ -224,7 +287,7 @@
                 </div>
 
                 <!-- Filters -->
-                <div class="w-full md:w-auto flex flex-col sm:flex-row items-center gap-2">
+                <div id="log-action-controls" class="w-full md:w-auto flex flex-col sm:flex-row items-center gap-2">
                     <button onclick="openAddModal()" class="w-full sm:w-auto whitespace-nowrap px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand-600 hover:bg-brand-500 text-white flex items-center justify-center gap-1.5 transition">
                         <i class="fa-solid fa-plus"></i> Add Manual Entry
                     </button>
@@ -390,10 +453,18 @@
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Date Ridden</label>
                         <input type="date" id="form-date-ridden" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <label class="mt-2 flex items-center gap-2 text-slate-400">
+                            <input type="checkbox" id="form-date-unknown" onchange="toggleUnknownRideDate('date')" class="h-4 w-4 rounded border-bordercolor bg-slate-800 text-brand-600 focus:ring-brand-500">
+                            <span>Unknown date</span>
+                        </label>
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Time Ridden</label>
                         <input type="time" id="form-time-ridden" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <label class="mt-2 flex items-center gap-2 text-slate-400">
+                            <input type="checkbox" id="form-time-unknown" onchange="toggleUnknownRideDate('time')" class="h-4 w-4 rounded border-bordercolor bg-slate-800 text-brand-600 focus:ring-brand-500">
+                            <span>Unknown time</span>
+                        </label>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -430,7 +501,7 @@
 
             <div class="p-6 space-y-3 text-xs overflow-y-auto">
                 <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Credit Calculation Rules</h4>
-                <p class="text-slate-400 mb-2">Choose which ride types and versions count toward Total Credits. These settings change the total, not which entries appear in your log.</p>
+                <p class="text-slate-400 mb-2">Choose which ride types and versions count toward Total. These settings change the total, not which entries appear in your log.</p>
 
                 <h4 class="pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Ride types</h4>
                 <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">

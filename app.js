@@ -384,21 +384,78 @@
             return labels[normalizedVariant] || normalizedVariant;
         }
 
+        function rideIdentityKey(entry) {
+            return JSON.stringify([
+                (entry.parkName || entry.parkNameRidden || '').trim().toLocaleLowerCase(),
+                (entry.coasterName || entry.coasterNameRidden || '').trim().toLocaleLowerCase(),
+                entry.type || 'Real',
+                normalizeRideVariant(entry.variant)
+            ]);
+        }
+
+        function getCoasterLogGroups(entries = coasterLog) {
+            const groupsByKey = new Map();
+            entries.forEach(entry => {
+                const key = rideIdentityKey(entry);
+                if (!groupsByKey.has(key)) {
+                    groupsByKey.set(key, { key, entry, entries: [], rideCount: 0 });
+                }
+                const group = groupsByKey.get(key);
+                group.entries.push(entry);
+                group.rideCount += Math.max(1, Number.parseInt(entry.rideCount, 10) || 1);
+            });
+            return [...groupsByKey.values()];
+        }
+
+        function duplicateRideGroupKeys(groups) {
+            const duplicateKeys = new Set();
+            const groupsByName = new Map();
+            groups.forEach(group => {
+                const name = (group.entry.coasterName || group.entry.coasterNameRidden || '').trim().toLocaleLowerCase();
+                if (!name) {
+                    if (normalizeRideVariant(group.entry.variant) === 'Relocated') duplicateKeys.add(group.key);
+                    return;
+                }
+                if (!groupsByName.has(name)) groupsByName.set(name, []);
+                groupsByName.get(name).push(group);
+            });
+            groupsByName.forEach(nameGroups => {
+                const relocatedGroups = nameGroups.filter(group => normalizeRideVariant(group.entry.variant) === 'Relocated');
+                relocatedGroups.forEach(group => duplicateKeys.add(group.key));
+                const distinctParks = new Set(nameGroups
+                    .map(group => (group.entry.parkName || group.entry.parkNameRidden || '').trim().toLocaleLowerCase())
+                    .filter(Boolean));
+                const duplicateCount = Math.max(relocatedGroups.length, distinctParks.size - 1);
+                let selectedCount = relocatedGroups.length;
+                for (const group of nameGroups) {
+                    if (selectedCount >= duplicateCount) break;
+                    if (duplicateKeys.has(group.key)) continue;
+                    duplicateKeys.add(group.key);
+                    selectedCount++;
+                }
+            });
+            return duplicateKeys;
+        }
+
         // Stats & Calculation Rules Logic
         function updateStatsAndCounters() {
             let realCount = 0;
             let poweredCount = 0;
             let alpineCount = 0;
             let waterCount = 0;
-            let duplicateCount = 0;
             let calculatedTotal = 0;
+            let relogCount = 0;
             
             // Unique Parks Set
             const uniqueParks = new Set();
+            const groups = getCoasterLogGroups();
+            const duplicateKeys = duplicateRideGroupKeys(groups);
 
-            coasterLog.forEach(entry => {
+            groups.forEach(group => {
+                const entry = group.entry;
                 const type = entry.type || 'Real';
                 const variant = normalizeRideVariant(entry.variant);
+                if (group.rideCount > 1) relogCount++;
 
                 // Count unique park names (prefer official, fallback to ridden name)
                 const parkKey = (entry.parkName || entry.parkNameRidden || '').trim().toLowerCase();
@@ -409,11 +466,6 @@
                 else if (type === 'Powered') poweredCount++;
                 else if (type === 'Alpine') alpineCount++;
                 else if (type === 'Water') waterCount++;
-
-                // Ride variations count
-                if (['ExperienceChange', 'ElementChange', 'Relocated'].includes(variant)) {
-                    duplicateCount++;
-                }
 
                 // Credit Calculation Evaluation
                 let isCredit = false;
@@ -443,10 +495,11 @@
             document.getElementById('stat-powered').innerText = poweredCount;
             document.getElementById('stat-alpine').innerText = alpineCount;
             document.getElementById('stat-water').innerText = waterCount;
-            document.getElementById('stat-duplicates').innerText = duplicateCount;
+            document.getElementById('stat-duplicates').innerText = duplicateKeys.size;
+            document.getElementById('stat-relogs').innerText = relogCount;
             document.getElementById('stat-parks').innerText = uniqueParks.size;
             document.getElementById('stat-total').innerText = calculatedTotal;
-            document.getElementById('log-count-badge').innerText = `${coasterLog.length} Rides Logged`;
+            document.getElementById('log-count-badge').innerText = `${groups.length} Rides Logged`;
             syncDashboardCardStyles();
         }
 
@@ -475,7 +528,6 @@
             activeDashboardFilter = isSameFilter ? null : { kind, value };
             syncDashboardCardStyles();
             renderLogbook();
-            document.getElementById('log-list').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         function syncDashboardCardStyles() {
@@ -514,12 +566,13 @@
         function renderParkBreakdown() {
             const panel = document.getElementById('park-breakdown');
             const parks = new Map();
-            coasterLog.forEach(entry => {
+            getCoasterLogGroups().forEach(group => {
+                const entry = group.entry;
                 const park = (entry.parkName || entry.parkNameRidden || '').trim();
                 if (!park) return;
                 const key = park.toLocaleLowerCase();
                 if (!parks.has(key)) parks.set(key, { name: park, entries: [] });
-                parks.get(key).entries.push(entry);
+                parks.get(key).entries.push(group);
             });
 
             if (!parks.size) {
@@ -528,7 +581,7 @@
             }
 
             panel.innerHTML = `<div class="mb-3 flex items-center justify-between">
-                <h3 class="text-sm font-semibold text-white">Parks Visited</h3>
+                <h3 class="text-sm font-semibold text-white">Parks</h3>
                 <button type="button" onclick="closeParkBreakdown()" class="text-xs text-slate-400 hover:text-white">Close</button>
             </div><div class="space-y-2">${[...parks.values()].sort((a, b) => a.name.localeCompare(b.name)).map(park => `
                 <details class="overflow-hidden rounded-xl border border-bordercolor bg-slate-900/50">
@@ -536,10 +589,10 @@
                         <span>${escapeHtml(park.name)}</span><span class="text-xs text-slate-500">${park.entries.length} logged ${park.entries.length === 1 ? 'ride' : 'rides'}</span>
                     </summary>
                     <div class="border-t border-bordercolor divide-y divide-bordercolor/70">
-                        ${park.entries.slice().sort((a, b) => (a.coasterName || '').localeCompare(b.coasterName || '')).map(entry => `
-                            <button type="button" data-park="${escapeHtml(park.name)}" data-coaster="${escapeHtml(entry.coasterName || '')}" onclick="applyDashboardFilter('ride', {park: this.dataset.park, coaster: this.dataset.coaster})" class="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-xs hover:bg-slate-800">
-                                <span class="text-slate-200">${escapeHtml(entry.coasterName || 'Unnamed coaster')}</span>
-                                <span class="text-slate-500">${escapeHtml(entry.rideStatus || 'Status unknown')}</span>
+                        ${park.entries.slice().sort((a, b) => (a.entry.coasterName || '').localeCompare(b.entry.coasterName || '')).map(group => `
+                            <button type="button" data-park="${escapeHtml(park.name)}" data-coaster="${escapeHtml(group.entry.coasterName || '')}" onclick="applyDashboardFilter('ride', {park: this.dataset.park, coaster: this.dataset.coaster})" class="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-xs hover:bg-slate-800">
+                                <span class="text-slate-200">${escapeHtml(group.entry.coasterName || 'Unnamed coaster')}${group.rideCount > 1 ? ` · ${group.rideCount} laps` : ''}</span>
+                                <span class="text-slate-500">${escapeHtml(group.entry.rideStatus || 'Status unknown')}</span>
                             </button>
                         `).join('')}
                     </div>
@@ -551,17 +604,23 @@
             const listContainer = document.getElementById('log-list');
             const searchVal = document.getElementById('log-search').value.toLowerCase().trim();
             const sortVal = document.getElementById('log-sort').value;
+            const groups = getCoasterLogGroups();
+            const duplicateKeys = duplicateRideGroupKeys(groups);
 
             // Filter entries
-            let filtered = coasterLog.filter(entry => {
-                const matchSearch = (entry.coasterName || '').toLowerCase().includes(searchVal) ||
-                                    (entry.coasterNameRidden || '').toLowerCase().includes(searchVal) ||
-                                    (entry.parkName || '').toLowerCase().includes(searchVal) ||
-                                    (entry.parkNameRidden || '').toLowerCase().includes(searchVal) ||
-                                    (entry.notes || '').toLowerCase().includes(searchVal);
+            let filtered = groups.filter(group => {
+                const entry = group.entry;
+                const matchSearch = group.entries.some(item =>
+                    (item.coasterName || '').toLowerCase().includes(searchVal) ||
+                    (item.coasterNameRidden || '').toLowerCase().includes(searchVal) ||
+                    (item.parkName || '').toLowerCase().includes(searchVal) ||
+                    (item.parkNameRidden || '').toLowerCase().includes(searchVal) ||
+                    (item.notes || '').toLowerCase().includes(searchVal)
+                );
                 const matchDashboardFilter = !activeDashboardFilter ||
                     (activeDashboardFilter.kind === 'type' && (entry.type || 'Real') === activeDashboardFilter.value) ||
-                    (activeDashboardFilter.kind === 'variants' && ['ExperienceChange', 'ElementChange', 'Relocated'].includes(normalizeRideVariant(entry.variant))) ||
+                    (activeDashboardFilter.kind === 'duplicates' && duplicateKeys.has(group.key)) ||
+                    (activeDashboardFilter.kind === 'relogs' && group.rideCount > 1) ||
                     (activeDashboardFilter.kind === 'credits' && isEntryCredit(entry)) ||
                     (activeDashboardFilter.kind === 'ride' &&
                         (entry.parkName || entry.parkNameRidden || '').toLowerCase() === activeDashboardFilter.value.park.toLowerCase() &&
@@ -571,15 +630,15 @@
 
             // Sort entries
             filtered.sort((a, b) => {
-                if (sortVal === 'date-desc') return rideDateValue(b) - rideDateValue(a);
-                if (sortVal === 'date-asc') return rideDateValue(a) - rideDateValue(b);
-                if (sortVal === 'name-asc') return (a.coasterName || '').localeCompare(b.coasterName || '');
-                if (sortVal === 'park-asc') return (a.parkName || '').localeCompare(b.parkName || '');
+                if (sortVal === 'date-desc') return rideDateValue(b.entry) - rideDateValue(a.entry);
+                if (sortVal === 'date-asc') return rideDateValue(a.entry) - rideDateValue(b.entry);
+                if (sortVal === 'name-asc') return (a.entry.coasterName || '').localeCompare(b.entry.coasterName || '');
+                if (sortVal === 'park-asc') return (a.entry.parkName || '').localeCompare(b.entry.parkName || '');
                 return 0;
             });
 
             if (filtered.length === 0) {
-                if (coasterLog.length === 0) {
+                if (groups.length === 0) {
                     listContainer.innerHTML = `
                         <div class="bg-cardbg rounded-2xl border border-bordercolor p-12 text-center">
                             <div class="w-16 h-16 rounded-full bg-slate-800 text-slate-500 flex items-center justify-center mx-auto mb-4 text-2xl">
@@ -608,7 +667,8 @@
             }
 
             let html = '';
-            filtered.forEach(entry => {
+            filtered.forEach(group => {
+                const entry = group.entry;
                 const coasterDisplayName = entry.coasterNameRidden && entry.coasterNameRidden !== entry.coasterName 
                     ? entry.coasterNameRidden 
                     : entry.coasterName;
@@ -633,7 +693,7 @@
                                 ${rideDateTime ? `<span><i class="fa-regular fa-calendar mr-1"></i>${escapeHtml(rideDateTime)}</span>` : ''}
                                 <span class="rounded-md border border-slate-700 px-2 py-0.5 text-[10px] uppercase tracking-wide">${escapeHtml(rideStatus)}</span>
                                 <span class="font-medium text-slate-200"><i class="fa-solid fa-location-dot text-brand-500 mr-1"></i>${escapeHtml(parkDisplayName)}</span>
-                                ${(entry.rideCount || 1) > 1 ? `<span><i class="fa-solid fa-ticket mr-1"></i>${entry.rideCount} laps</span>` : ''}
+                                ${group.rideCount > 1 ? `<span><i class="fa-solid fa-ticket mr-1"></i>${group.rideCount} laps</span>` : ''}
                             </div>
                             ${entry.notes ? `<p class="text-[11px] italic text-slate-500">${escapeHtml(entry.notes)}</p>` : ''}
                         </div>
@@ -1381,6 +1441,10 @@
             const now = new Date();
             document.getElementById('form-date-ridden').value = formatLocalDate(now);
             document.getElementById('form-time-ridden').value = formatLocalTime(now);
+            document.getElementById('form-date-unknown').checked = false;
+            document.getElementById('form-time-unknown').checked = false;
+            toggleUnknownRideDate('date');
+            toggleUnknownRideDate('time');
             document.getElementById('form-ride-status').value = 'Unknown';
             document.getElementById('form-ride-count').value = 1;
             document.getElementById('form-notes').value = '';
@@ -1390,7 +1454,8 @@
 
         function openEditModal(id) {
             if (!requireSignedIn()) return false;
-            const entry = coasterLog.find(e => e.id === id);
+            const group = getCoasterLogGroups().find(item => item.entries.some(entry => entry.id === id));
+            const entry = group?.entry;
             if (!entry) return false;
 
             document.getElementById('modal-entry-title').innerHTML = `<i class="fa-solid fa-pen-to-square text-brand-500"></i> Edit Log Entry`;
@@ -1403,8 +1468,12 @@
             document.getElementById('form-variant-type').value = normalizeRideVariant(entry.variant);
             document.getElementById('form-date-ridden').value = entry.dateRidden || '';
             document.getElementById('form-time-ridden').value = entry.timeRidden || '';
+            document.getElementById('form-date-unknown').checked = entry.unknownDate === true;
+            document.getElementById('form-time-unknown').checked = entry.unknownTime === true;
+            toggleUnknownRideDate('date');
+            toggleUnknownRideDate('time');
             document.getElementById('form-ride-status').value = entry.rideStatus || 'Unknown';
-            document.getElementById('form-ride-count').value = entry.rideCount || 1;
+            document.getElementById('form-ride-count').value = group.rideCount;
             document.getElementById('form-notes').value = entry.notes || '';
 
             document.getElementById('modal-entry').classList.remove('hidden');
@@ -1413,11 +1482,11 @@
 
         function relogEntry(id, rideDetails = null) {
             if (!requireSignedIn()) return;
-            const entry = coasterLog.find(item => item.id === id);
-            if (!entry) return;
+            const group = getCoasterLogGroups().find(item => item.entries.some(entry => entry.id === id));
+            if (!group) return;
             const now = new Date();
-            coasterLog.unshift({
-                ...entry,
+            const reloggedEntry = {
+                ...group.entry,
                 ...(rideDetails ? {
                     coasterName: rideDetails.name,
                     coasterNameRidden: rideDetails.name,
@@ -1425,13 +1494,17 @@
                     type: rideDetails.type,
                     variant: normalizeRideVariant(rideDetails.variant)
                 } : {}),
-                id: 'entry_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                id: group.entry.id || 'entry_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
                 dateRidden: formatLocalDate(now),
                 timeRidden: formatLocalTime(now),
+                unknownDate: false,
+                unknownTime: false,
                 loggedAt: now.toISOString(),
-                rideCount: 1,
-                notes: ''
-            });
+                rideCount: group.rideCount + 1
+            };
+            const groupIds = new Set(group.entries.map(entry => entry.id));
+            coasterLog = coasterLog.filter(entry => !groupIds.has(entry.id));
+            coasterLog.unshift(reloggedEntry);
             saveToLocalStorage();
             updateStatsAndCounters();
             renderLogbook();
@@ -1452,8 +1525,11 @@
         }
 
         function formatRideDateTime(entry) {
-            if (entry.dateRidden && entry.timeRidden) return `${entry.dateRidden} ${entry.timeRidden}`;
-            if (entry.dateRidden) return `${entry.dateRidden} · time not recorded`;
+            const date = entry.unknownDate ? '' : entry.dateRidden || '';
+            const time = entry.unknownTime ? '' : entry.timeRidden || '';
+            if (date && time) return `${date} ${time}`;
+            if (date || time) return date || time;
+            if (entry.unknownDate || entry.unknownTime) return '';
             if (entry.loggedAt) return new Date(entry.loggedAt).toLocaleString();
             return '';
         }
@@ -1477,6 +1553,14 @@
             document.getElementById('modal-entry').classList.add('hidden');
         }
 
+        function toggleUnknownRideDate(field) {
+            const isDate = field === 'date';
+            const checkbox = document.getElementById(isDate ? 'form-date-unknown' : 'form-time-unknown');
+            const input = document.getElementById(isDate ? 'form-date-ridden' : 'form-time-ridden');
+            input.disabled = checkbox.checked;
+            if (checkbox.checked) input.value = '';
+        }
+
         function saveEntry(e) {
             e.preventDefault();
             if (!requireSignedIn()) return;
@@ -1489,12 +1573,15 @@
             const variant = document.getElementById('form-variant-type').value;
             const dateRidden = document.getElementById('form-date-ridden').value;
             const timeRidden = document.getElementById('form-time-ridden').value;
+            const unknownDate = document.getElementById('form-date-unknown').checked;
+            const unknownTime = document.getElementById('form-time-unknown').checked;
             const rideStatus = document.getElementById('form-ride-status').value;
             const rideCount = parseInt(document.getElementById('form-ride-count').value) || 1;
             const notes = document.getElementById('form-notes').value.trim();
 
             if (id) {
                 // Edit existing
+                const group = getCoasterLogGroups().find(item => item.entries.some(entry => entry.id === id));
                 const index = coasterLog.findIndex(e => e.id === id);
                 if (index !== -1) {
                     coasterLog[index] = {
@@ -1507,10 +1594,16 @@
                         variant,
                         dateRidden,
                         timeRidden,
+                        unknownDate,
+                        unknownTime,
                         rideStatus,
                         rideCount,
                         notes
                     };
+                    if (group?.entries.length > 1) {
+                        const otherIds = new Set(group.entries.filter(entry => entry.id !== id).map(entry => entry.id));
+                        coasterLog = coasterLog.filter(entry => !otherIds.has(entry.id));
+                    }
                     showToast('Log entry updated', 'success');
                 }
             } else {
@@ -1525,6 +1618,8 @@
                     variant,
                     dateRidden,
                     timeRidden,
+                    unknownDate,
+                    unknownTime,
                     rideStatus,
                     loggedAt: new Date().toISOString(),
                     rideCount,
@@ -1549,7 +1644,9 @@
         function deleteEntry(id) {
             if (!requireSignedIn()) return;
             if (!confirm('Are you sure you want to remove this coaster entry?')) return;
-            coasterLog = coasterLog.filter(e => e.id !== id);
+            const group = getCoasterLogGroups().find(item => item.entries.some(entry => entry.id === id));
+            const groupIds = new Set((group?.entries || []).map(entry => entry.id));
+            coasterLog = coasterLog.filter(entry => !groupIds.has(entry.id));
             saveToLocalStorage();
             updateStatsAndCounters();
             renderLogbook();

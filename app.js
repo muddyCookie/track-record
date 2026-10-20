@@ -1351,6 +1351,18 @@
                 ride.closingDate = details.closingDate;
                 ride.changeClassification = details.changeClassification;
                 ride.nameHistory = details.nameHistory;
+                if (ride.name.toLocaleLowerCase() === details.currentName.toLocaleLowerCase()) {
+                    const currentNameIndex = details.nameHistory.findIndex(item =>
+                        item.name.toLocaleLowerCase() === details.currentName.toLocaleLowerCase()
+                    );
+                    ride.historicalNames = [...new Set([
+                        ...(ride.historicalNames || []),
+                        ...details.nameHistory
+                            .slice(0, currentNameIndex < 0 ? 0 : currentNameIndex)
+                            .map(item => item.name)
+                            .filter(name => name.toLocaleLowerCase() !== ride.name.toLocaleLowerCase())
+                    ])];
+                }
                 const currentNameVersion = details.nameHistory.find(item =>
                     item.name.toLocaleLowerCase() === details.currentName.toLocaleLowerCase()
                 );
@@ -1396,7 +1408,7 @@
                     const details = articlesByTitle.get(page.title.toLowerCase());
                     const changeClassification = details?.changeClassification || 'uncertain';
                     if (isNameOnlyRideChange(ride.name, name) || changeClassification === 'minor') {
-                        ride.historicalNames = [...(ride.historicalNames || []), name];
+                        ride.historicalNames = [...new Set([...(ride.historicalNames || []), name])];
                         return;
                     }
                     const formerNameIndex = details?.nameHistory?.findIndex(item =>
@@ -1520,10 +1532,8 @@
             const currentName = nameHistory.find(item => /present|current/i.test(item.to))?.name ||
                 nameHistory.at(-1)?.name ||
                 '';
+            const changeEvidence = getCoasterpediaChangeEvidence(wikitext);
             const changeClassification = classifyCoasterpediaChange(wikitext, infobox, nameHistory);
-            const changeEvidence = wikitext.split(/[.!?\n]/)
-                .find(sentence => isStructuralRideChange(sentence.toLowerCase()) ||
-                    isMajorRideTransformation(sentence.toLowerCase())) || '';
             const currentVersionStart = nameHistory.find(item => item.name === currentName)?.from || '';
             return {
                 names: new Set(names),
@@ -1533,9 +1543,14 @@
                 openingDate: parseCoasterpediaDate(dateInfobox.match(/^\|opened\s*=\s*(.+)$/im)?.[1] || ''),
                 closingDate: parseCoasterpediaDate(dateInfobox.match(/^\|closed\s*=\s*(.+)$/im)?.[1] || ''),
                 changeClassification,
+                changeEvidence: changeEvidence.find(item => item.type === 'major')?.text ||
+                    changeEvidence.find(item => item.type === 'track')?.text ||
+                    changeEvidence.find(item => item.type === 'structural')?.text ||
+                    '',
                 changeYear: changeClassification === 'reimagined'
                     ? currentVersionStart.match(/\b(?:18|19|20)\d{2}\b/)?.[0] ||
-                        changeEvidence.match(/\b(?:18|19|20)\d{2}\b/)?.[0] ||
+                        (changeEvidence.find(item => ['major', 'track', 'structural'].includes(item.type))?.text || '')
+                            .match(/\b(?:18|19|20)\d{2}\b/)?.[0] ||
                         ''
                     : '',
                 hasReimaginedVersion: changeClassification === 'reimagined' && nameHistory.length < 2
@@ -1543,37 +1558,68 @@
         }
 
         function classifyCoasterpediaChange(wikitext, infobox, nameHistory) {
-            const normalizedText = wikitext.toLocaleLowerCase();
+            const evidence = getCoasterpediaChangeEvidence(wikitext);
             const hasHistoricalSpecification = value =>
                 /originally|\b(?:19|20)\d{2}\s*[-–]\s*(?:19|20)\d{2}\b/i.test(value) ||
                 (/<br\s*\/?\s*>/i.test(value) && /\[\[[^\]]+\]\]/.test(value));
             const trackMaterial = infobox.match(/^\|track_material\s*=\s*(.+)$/im)?.[1] || '';
             const trackMaterialChange = hasHistoricalSpecification(trackMaterial) &&
                 /\bwood(?:en)?\b/i.test(trackMaterial) && /\bsteel\b/i.test(trackMaterial);
-            const specificationChange = ['category1', 'category2', 'lift/launch'].some(field => {
+            const rideTypeSpecificationChange = ['category1', 'category2', 'lift/launch'].some(field => {
                 const value = infobox.match(new RegExp(`^\\|${field.replace('/', '\\/')}\\s*=\\s*(.+)$`, 'im'))?.[1] || '';
                 return hasHistoricalSpecification(value);
             });
-            if (normalizedText.split(/[.!?\n]/).some(sentence =>
-                isStructuralRideChange(sentence) ||
-                isMajorRideTransformation(sentence) ||
-                isTrackMaterialChange(sentence)
-            ) ||
+            const productHistory = infobox.match(/^\|product\s*=\s*(.+)$/im)?.[1] || '';
+            const documentedRefurbishment = nameHistory.length > 1 &&
+                /<br\s*\/?\s*>/i.test(productHistory) &&
+                /\b(?:original|refurbishment|conversion)\b/i.test(productHistory);
+            if (evidence.some(item => ['major', 'track', 'structural'].includes(item.type)) ||
                 trackMaterialChange ||
-                (specificationChange && nameHistory.length > 1)) {
+                (rideTypeSpecificationChange && nameHistory.length > 1) ||
+                documentedRefurbishment) {
                 return 'reimagined';
             }
-            if (/\b(?:renamed|name changed|new name|repainted|new colour scheme|new color scheme|new trains?|train was replaced|rethemed|new theme|theme change|retrack(?:ed|ing|s)?)\b/i.test(normalizedText)) {
+            if (evidence.some(item => item.type === 'minor')) {
                 return 'minor';
             }
             return nameHistory.length > 1 ? 'uncertain' : 'none';
         }
 
+        function getCoasterpediaChangeEvidence(wikitext) {
+            const articleText = wikitext
+                .split(/^={2,}\s*(?:references|external links|further reading|notes)\s*={2,}\s*$/im)[0]
+                .replace(/<!--[\s\S]*?-->/g, '')
+                .replace(/<ref\b[^>]*>[\s\S]*?<\/ref\s*>/gi, ' ')
+                .replace(/<ref\b[^>]*\/\s*>/gi, ' ')
+                .replace(/<[^>]+>/g, ' ')
+                .replace(/\{\{[\s\S]*?\}\}/g, ' ')
+                .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2')
+                .replace(/\[\[([^\]]+)\]\]/g, '$1')
+                .replace(/\[(?:https?:\/\/\S+)\s+([^\]]+)\]/g, '$1')
+                .replace(/'{2,}/g, '')
+                .replace(/^\s*[=|!].*$/gm, ' ');
+            const sentences = articleText.split(/(?<=[.!?])\s+|\r?\n/)
+                .map(sentence => sentence.replace(/\s+/g, ' ').trim())
+                .filter(Boolean);
+
+            return sentences.flatMap(sentence => {
+                const normalized = sentence.toLocaleLowerCase();
+                if (isMajorRideTransformation(normalized)) return [{ type: 'major', text: sentence }];
+                if (isTrackMaterialChange(normalized)) return [{ type: 'track', text: sentence }];
+                if (isStructuralRideChange(normalized)) return [{ type: 'structural', text: sentence }];
+                if (/\b(?:renamed|name changed|new name|repainted|new colour scheme|new color scheme|new trains?|train was replaced|rethemed|new theme|theme change|retrack(?:ed|ing|s)?)\b/i.test(normalized)) {
+                    return [{ type: 'minor', text: sentence }];
+                }
+                return [];
+            });
+        }
+
         function isStructuralRideChange(sentence) {
-            const structuralNoun = '(?:layout|elements?|drop|lift|launch|loop|inversion|course|coaster type)';
-            const changeVerb = '(?:chang(?:e|ed|es|ing)|modif(?:y|ied|ies|ication)|replac(?:e|ed|es|ing)|remov(?:e|ed|es|ing)|add(?:ed|s|ing)|convert(?:ed|s|ing)|reprofil(?:ed|e|ing))';
-            return new RegExp(`\\b${structuralNoun}\\b(?:(?!\\bnot\\b)[^.!?\\n]){0,180}\\b${changeVerb}\\b`, 'i').test(sentence) ||
-                new RegExp(`\\b${changeVerb}\\b(?:(?!\\bnot\\b)[^.!?\\n]){0,180}\\b${structuralNoun}\\b`, 'i').test(sentence) ||
+            const structuralNoun = '(?:track layout|track elements?|ride elements?|layout|drop|lift(?: hill)?|launch|loop|inversions?|brakes|course|coaster type)';
+            const changeVerb = '(?:chang(?:e|ed|es|ing)|modif(?:y|ied|ies|ication)|alter(?:ed|ing)|reconfigur(?:ed|ing)|redesign(?:ed|ing)|replac(?:e|ed|es|ing)|remov(?:e|ed|es|ing)|add(?:ed|s|ing)|install(?:ed|ing)|convert(?:ed|s|ing)|reprofil(?:ed|e|ing))';
+            return new RegExp(`\\b${structuralNoun}\\b\\s+(?:was\\s+|were\\s+|has\\s+been\\s+|have\\s+been\\s+)?${changeVerb}\\b`, 'i').test(sentence) ||
+                new RegExp(`\\b${changeVerb}\\b\\s+(?:the\\s+|a\\s+)?${structuralNoun}\\b`, 'i').test(sentence) ||
+                /\b(?:launch|lift hill|drop|brakes?|inversions?)\b[^.!?\n]{0,80}\b(?:replaced|changed|modified|added|removed|installed|converted)\b/i.test(sentence) ||
                 /\bconverted?\s+(?:from\b.{0,80}\bto\b|into\b.{0,60}\b(?:floorless|stand.?up|sit.?down|inverted|launched|wooden|steel))\b/i.test(sentence);
         }
 
@@ -1585,10 +1631,15 @@
 
         function isMajorRideTransformation(sentence) {
             return /\b(?:virtual reality|vr)\s+(?:overlay|experience|conversion|version)\b/i.test(sentence) ||
-                /\b(?:convert(?:ed|s|ing)?|chang(?:ed|es|ing)|mov(?:ed|es|ing))\b[^.!?\n]{0,120}\b(?:indoor|outdoor)\b[^.!?\n]{0,120}\b(?:indoor|outdoor)\b/i.test(sentence) ||
-                /\b(?:convert(?:ed|s|ing)?|chang(?:ed|es|ing)|mov(?:ed|es|ing))\b[^.!?\n]{0,120}\b(?:indoor|outdoor)\b/i.test(sentence) ||
-                /\b(?:completely|fully)\s+enclos(?:ed|ing)\b/i.test(sentence) ||
-                /\b(?:converted|changed)\s+(?:from\s+)?(?:a\s+)?stand.?up\s+(?:coaster|ride)?\s*(?:to|into)\s+(?:a\s+)?floorless\b/i.test(sentence) ||
+                /\bconvert(?:ed|ing)?\b[^.!?\n]{0,100}\b(?:from\s+)?(?:outdoor|indoor)\b[^.!?\n]{0,100}\b(?:to\s+)?(?:outdoor|indoor|inside|outside)\b/i.test(sentence) ||
+                /\b(?:moved|relocated)\s+(?:the\s+)?(?:ride|coaster)?\s*(?:indoors|outdoors)\b/i.test(sentence) ||
+                /\b(?:converted|changed)\b[^.!?\n]{0,60}\b(?:into|to)\s+(?:an?\s+)?(?:indoor|outdoor)\s+(?:ride|coaster)\b/i.test(sentence) ||
+                /\b(?:renovat|transform|convert|rebuild)[^.!?\n]{0,120}\b(?:completely|fully)?\s*enclos(?:ed|ing)\b/i.test(sentence) ||
+                /\b(?:completely|fully)\s+enclos(?:ed|ing)\s+(?:it|the ride|the coaster)\b/i.test(sentence) ||
+                /\b(?:enclos(?:ed|ing))\b[^.!?\n]{0,120}\b(?:ride|coaster|building)\b[^.!?\n]{0,60}\b(?:convert(?:ed|s|ing)?|renovat(?:e|ed|ing)|transform(?:ed|ation|ing))\b/i.test(sentence) ||
+                /\b(?:convert(?:ed|s|ing)?|renovat(?:e|ed|ing)|transform(?:ed|ation|ing))\b[^.!?\n]{0,120}\b(?:enclos(?:ed|ing)|enclosure)\b/i.test(sentence) ||
+                /\b(?:convert(?:ed|s|ing)?|chang(?:ed|es|ing))\b[^.!?\n]{0,120}\b(?:into\s+)?(?:a\s+)?floorless(?:\s+coaster)?\b/i.test(sentence) ||
+                /\b(?:convert(?:ed|s|ing)?|chang(?:ed|es|ing))\b[^.!?\n]{0,120}\bstand.?up\b[^.!?\n]{0,120}\bfloorless\b/i.test(sentence) ||
                 /\b(?:converted|changed)\s+(?:from\s+)?(?:a\s+)?floorless\s+(?:coaster|ride)?\s*(?:to|into)\s+(?:a\s+)?stand.?up\b/i.test(sentence);
         }
 
@@ -1683,10 +1734,10 @@
                                     <a href="${articleUrl}" target="_blank" rel="noopener noreferrer" class="truncate text-sm font-semibold text-slate-100 hover:text-brand-400">${escapeHtml(ride.name)}</a>
                                     <span class="rounded-md border border-brand-500/20 bg-brand-500/10 px-2 py-0.5 text-[10px] font-semibold text-brand-300">${escapeHtml(rideType)}</span>
                                 </div>
-                                ${ride.historicalNames?.length ? `<p class="mt-1 text-[11px] text-slate-500">Also known as ${ride.historicalNames.map(escapeHtml).join(', ')}</p>` : ''}
+                                ${ride.historicalNames?.length ? `<p class="mt-1 text-[11px] text-slate-500">Previously known as ${ride.historicalNames.map(escapeHtml).join(', ')}</p>` : ''}
                                 ${variant !== 'Original' ? `<span class="mt-1 inline-block rounded-md border border-violet-500/20 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold text-violet-300">${escapeHtml(rideVariantLabel(variant))}</span>` : ''}
                                 ${reviewNotice}
-                                ${ride.hasReimaginedVersion ? `<p class="mt-1 text-[11px] text-violet-300">Coasterpedia documents a track or element change${ride.changeYear ? ` in ${escapeHtml(ride.changeYear)}` : ''}; the reimagined version can be logged separately.</p>` : ''}
+                                ${ride.hasReimaginedVersion ? `<p class="mt-1 text-[11px] text-violet-300">Coasterpedia history indicates a substantial ride change${ride.changeYear ? ` around ${escapeHtml(ride.changeYear)}` : ''}; you can log the reimagined version separately.</p>` : ''}
                                 ${dateLabel}
                                 ${sameNameRideCount > 1 && matchingParkEntries.some(entry => !entry.coasterpediaRideId)
                                     ? '<p class="mt-1 text-[10px] text-amber-400">Older same-name logs are not assigned to a specific ride. New logs will be distinguished automatically.</p>'

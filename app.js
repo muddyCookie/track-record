@@ -518,6 +518,9 @@
         }
 
         function applyDashboardFilter(kind, value = null) {
+            const scrollX = window.scrollX;
+            const scrollY = window.scrollY;
+            const logList = document.getElementById('log-list');
             document.getElementById('park-breakdown').classList.add('hidden');
             const isSameFilter = activeDashboardFilter?.kind === kind &&
                 (kind !== 'type' || activeDashboardFilter.value === value) &&
@@ -525,9 +528,18 @@
                     activeDashboardFilter.value.park.toLowerCase() === value.park.toLowerCase() &&
                     activeDashboardFilter.value.coaster.toLowerCase() === value.coaster.toLowerCase()
                 ));
-            activeDashboardFilter = isSameFilter ? null : { kind, value };
+            if (isSameFilter) {
+                activeDashboardFilter = null;
+                logList.style.minHeight = '';
+            } else {
+                if (!activeDashboardFilter) {
+                    logList.style.minHeight = `${logList.getBoundingClientRect().height}px`;
+                }
+                activeDashboardFilter = { kind, value };
+            }
             syncDashboardCardStyles();
             renderLogbook();
+            requestAnimationFrame(() => window.scrollTo({ left: scrollX, top: scrollY, behavior: 'instant' }));
         }
 
         function syncDashboardCardStyles() {

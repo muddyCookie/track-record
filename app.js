@@ -45,6 +45,7 @@
                 });
             } catch (error) {
                 console.error('Firebase initialization failed:', error);
+                openAuthDialog();
                 showAuthMessage(`Could not connect to Firebase: ${error.message}`, 'error');
             }
             document.addEventListener('click', event => {
@@ -100,14 +101,19 @@
                 coasterLog = [];
                 creditRules = { ...DEFAULT_CREDIT_RULES };
                 activeDashboardFilter = null;
+                document.getElementById('modal-entry').classList.add('hidden');
+                document.getElementById('modal-settings').classList.add('hidden');
                 document.getElementById('park-breakdown').classList.add('hidden');
                 emailLabel.innerText = '';
-                appContent.classList.add('hidden');
-                authScreen.classList.remove('hidden');
+                appContent.classList.remove('hidden');
+                authScreen.classList.add('hidden');
+                authScreen.classList.remove('flex');
                 document.getElementById('auth-submit').disabled = false;
                 document.getElementById('auth-retry').classList.add('hidden');
                 document.getElementById('auth-signout').classList.add('hidden');
+                document.getElementById('continue-as-guest').classList.remove('hidden');
                 showAuthMessage('', 'status');
+                updateAccountAction();
                 updateStatsAndCounters();
                 renderLogbook();
                 return;
@@ -118,7 +124,9 @@
             cloudDataSubscription = null;
             appContent.classList.add('hidden');
             authScreen.classList.remove('hidden');
+            authScreen.classList.add('flex');
             document.getElementById('auth-submit').disabled = true;
+            document.getElementById('continue-as-guest').classList.add('hidden');
             showAuthMessage('Loading your private coaster log...', 'status');
 
             try {
@@ -151,7 +159,9 @@
                 document.getElementById('auth-retry').classList.add('hidden');
                 document.getElementById('auth-signout').classList.add('hidden');
                 authScreen.classList.add('hidden');
+                authScreen.classList.remove('flex');
                 appContent.classList.remove('hidden');
+                updateAccountAction();
                 cloudDataSubscription = window.trackRecordCloud.subscribeData(user, data => {
                     if (currentUser?.uid !== user.uid) return;
                     const nextRules = data.creditRules ? migrateCreditRules(data.creditRules) : creditRules;
@@ -172,11 +182,58 @@
             } catch (error) {
                 if (requestId !== authLoadRequestId) return;
                 currentUser = null;
+                appContent.classList.remove('hidden');
                 document.getElementById('auth-submit').disabled = false;
                 document.getElementById('auth-retry').classList.remove('hidden');
                 document.getElementById('auth-signout').classList.remove('hidden');
+                document.getElementById('continue-as-guest').classList.remove('hidden');
+                updateAccountAction();
                 showAuthMessage(`Could not load your cloud data: ${error.message}`, 'error');
             }
+        }
+
+        function updateAccountAction() {
+            const signedIn = Boolean(currentUser);
+            document.getElementById('account-action-label').innerText = signedIn ? 'Sign out' : 'Sign in';
+            document.getElementById('account-action-icon').className = signedIn
+                ? 'fa-solid fa-arrow-right-from-bracket'
+                : 'fa-solid fa-arrow-right-to-bracket';
+            document.getElementById('account-action').title = signedIn ? 'Sign out' : 'Sign in';
+        }
+
+        function openAuthDialog(message = '') {
+            const authScreen = document.getElementById('auth-screen');
+            authScreen.classList.remove('hidden');
+            authScreen.classList.add('flex');
+            document.getElementById('auth-submit').disabled = false;
+            document.getElementById('continue-as-guest').classList.toggle('hidden', Boolean(currentUser));
+            showAuthMessage(message, 'status');
+        }
+
+        function closeAuthDialog() {
+            if (currentUser) return;
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('auth-screen').classList.remove('flex');
+            showAuthMessage('', 'status');
+        }
+
+        function requireSignedIn() {
+            if (currentUser) return true;
+            openAuthDialog('Sign in or create an account to log and manage coaster credits.');
+            return false;
+        }
+
+        async function handleAccountAction() {
+            if (currentUser) {
+                await signOutAccount();
+                return;
+            }
+            const existingUser = window.trackRecordCloud?.getCurrentUser();
+            if (existingUser) {
+                await handleFirebaseAuthState(existingUser);
+                return;
+            }
+            openAuthDialog();
         }
 
         function syncCreditRuleInputs() {
@@ -532,14 +589,14 @@
                             <div class="w-16 h-16 rounded-full bg-slate-800 text-slate-500 flex items-center justify-center mx-auto mb-4 text-2xl">
                                 <i class="fa-solid fa-ghost"></i>
                             </div>
-                            <h3 class="text-base font-semibold text-white mb-1">Your Coaster Log is Empty</h3>
-                            <p class="text-xs text-slate-400 max-w-md mx-auto mb-6">Start building your credit list by searching for theme parks or manually adding rides you've ridden!</p>
+                            <h3 class="text-base font-semibold text-white mb-1">${currentUser ? 'Your Coaster Log is Empty' : 'Browsing as a Guest'}</h3>
+                            <p class="text-xs text-slate-400 max-w-md mx-auto mb-6">${currentUser ? "Start building your credit list by searching for theme parks or manually adding rides you've ridden!" : 'Your personal log is private and only appears after you sign in. Browse coaster parks freely, or sign in to view and manage your credits.'}</p>
                             <div class="flex justify-center gap-3">
                                 <button onclick="switchTab('search')" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-brand-600/20 transition">
                                     <i class="fa-solid fa-magnifying-glass mr-1.5"></i> Search Theme Parks
                                 </button>
-                                <button onclick="openAddModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-bordercolor rounded-xl text-xs font-semibold transition">
-                                    <i class="fa-solid fa-plus mr-1.5"></i> Add Custom Entry
+                                <button onclick="${currentUser ? 'openAddModal()' : 'openAuthDialog()'}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-bordercolor rounded-xl text-xs font-semibold transition">
+                                    <i class="fa-solid ${currentUser ? 'fa-plus' : 'fa-right-to-bracket'} mr-1.5"></i> ${currentUser ? 'Add Custom Entry' : 'Sign in'}
                                 </button>
                             </div>
                         </div>
@@ -1304,7 +1361,7 @@
 
         // Quick Log from Coasterpedia's park directory
         function quickLogRide(parkName, rideName, variant = 'Original', type = 'Real', status = 'Unknown') {
-            openAddModal();
+            if (!openAddModal()) return;
             document.getElementById('form-park-name').value = parkName;
             document.getElementById('form-park-ridden').value = parkName;
             document.getElementById('form-coaster-name').value = rideName;
@@ -1316,6 +1373,7 @@
 
         // Modal Handlers & Form Actions
         function openAddModal() {
+            if (!requireSignedIn()) return false;
             document.getElementById('modal-entry-title').innerHTML = `<i class="fa-solid fa-pen-to-square text-brand-500"></i> Add Log Entry`;
             document.getElementById('form-entry-id').value = '';
             document.getElementById('form-park-name').value = '';
@@ -1331,11 +1389,13 @@
             document.getElementById('form-ride-count').value = 1;
             document.getElementById('form-notes').value = '';
             document.getElementById('modal-entry').classList.remove('hidden');
+            return true;
         }
 
         function openEditModal(id) {
+            if (!requireSignedIn()) return false;
             const entry = coasterLog.find(e => e.id === id);
-            if (!entry) return;
+            if (!entry) return false;
 
             document.getElementById('modal-entry-title').innerHTML = `<i class="fa-solid fa-pen-to-square text-brand-500"></i> Edit Log Entry`;
             document.getElementById('form-entry-id').value = entry.id;
@@ -1352,9 +1412,11 @@
             document.getElementById('form-notes').value = entry.notes || '';
 
             document.getElementById('modal-entry').classList.remove('hidden');
+            return true;
         }
 
         function relogEntry(id, rideDetails = null) {
+            if (!requireSignedIn()) return;
             const entry = coasterLog.find(item => item.id === id);
             if (!entry) return;
             const now = new Date();
@@ -1408,7 +1470,7 @@
         }
 
         function openRideEntryEdit(id, currentCoasterName) {
-            openEditModal(id);
+            if (!openEditModal(id)) return;
             const coasterNameInput = document.getElementById('form-coaster-name');
             if (coasterNameInput.value !== currentCoasterName) {
                 coasterNameInput.value = currentCoasterName;
@@ -1421,6 +1483,7 @@
 
         function saveEntry(e) {
             e.preventDefault();
+            if (!requireSignedIn()) return;
             const id = document.getElementById('form-entry-id').value;
             const parkName = document.getElementById('form-park-name').value.trim();
             const parkNameRidden = document.getElementById('form-park-ridden').value.trim() || parkName;
@@ -1488,6 +1551,7 @@
         }
 
         function deleteEntry(id) {
+            if (!requireSignedIn()) return;
             if (!confirm('Are you sure you want to remove this coaster entry?')) return;
             coasterLog = coasterLog.filter(e => e.id !== id);
             saveToLocalStorage();
@@ -1503,6 +1567,7 @@
 
         // Settings Modal Handlers
         function openSettingsModal() {
+            if (!requireSignedIn()) return;
             document.getElementById('modal-settings').classList.remove('hidden');
         }
 
@@ -1511,6 +1576,10 @@
         }
 
         function saveRules() {
+            if (!requireSignedIn()) {
+                syncCreditRuleInputs();
+                return;
+            }
             creditRules = {
                 powered: document.getElementById('rule-powered').checked,
                 alpine: document.getElementById('rule-alpine').checked,
@@ -1525,6 +1594,7 @@
 
         // Import & Export Handlers
         function exportData(format) {
+            if (!requireSignedIn()) return;
             if (coasterLog.length === 0) {
                 showToast('No data to export', 'error');
                 return;
@@ -1542,7 +1612,16 @@
             }
         }
 
+        function requestImportData() {
+            if (!requireSignedIn()) return;
+            document.getElementById('import-file-input').click();
+        }
+
         function importData(event) {
+            if (!requireSignedIn()) {
+                event.target.value = '';
+                return;
+            }
             const file = event.target.files[0];
             if (!file) return;
 

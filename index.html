@@ -52,7 +52,7 @@
     <!-- Toast Notification Overlay -->
     <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-    <div id="auth-screen" class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/95 p-4">
+    <div id="auth-screen" class="fixed inset-0 z-[60] hidden items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
         <form id="auth-form" onsubmit="submitAuthForm(event)" class="w-full max-w-md rounded-2xl border border-bordercolor bg-cardbg p-6 shadow-2xl">
             <div class="mb-6 flex items-center gap-3">
                 <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 text-white shadow-md shadow-brand-500/20">
@@ -67,7 +67,7 @@
                 </span>
                 <div>
                     <h1 class="text-xl font-bold text-white">Track Record</h1>
-                    <p class="text-xs text-slate-400">Sign in to sync your credits</p>
+                    <p class="text-xs text-slate-400">Sign in to access and sync your private credits</p>
                 </div>
             </div>
             <div class="space-y-4">
@@ -88,11 +88,12 @@
                     <button id="auth-mode-toggle" type="button" onclick="toggleAuthMode()" class="text-brand-300 hover:text-brand-200">Create an account</button>
                     <button id="auth-reset" type="button" onclick="resetAccountPassword()" class="text-slate-400 hover:text-white">Forgot password?</button>
                 </div>
+                <button id="continue-as-guest" type="button" onclick="closeAuthDialog()" class="w-full rounded-xl border border-bordercolor px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white">Continue browsing as guest</button>
             </div>
         </form>
     </div>
 
-    <div id="app-content" class="hidden">
+    <div id="app-content">
     <!-- Header Navigation -->
     <header class="bg-cardbg border-b border-bordercolor sticky top-0 z-40 shadow-lg">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -115,8 +116,8 @@
                 <!-- Navigation Tabs -->
                 <div class="flex flex-wrap items-center justify-end gap-2">
                     <span id="account-email" class="hidden max-w-40 truncate px-2 text-xs text-slate-400 sm:inline"></span>
-                    <button type="button" onclick="signOutAccount()" class="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-slate-400 transition hover:bg-slate-800 hover:text-white" title="Sign out">
-                        <i class="fa-solid fa-arrow-right-from-bracket"></i><span class="hidden sm:inline">Sign out</span>
+                    <button id="account-action" type="button" onclick="handleAccountAction()" class="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-slate-400 transition hover:bg-slate-800 hover:text-white" title="Sign in">
+                        <i id="account-action-icon" class="fa-solid fa-arrow-right-to-bracket"></i><span id="account-action-label">Sign in</span>
                     </button>
                     <button onclick="openSettingsModal()" class="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-150 text-slate-400 hover:text-white hover:bg-slate-800" title="Settings">
                         <i class="fa-solid fa-gear"></i>
@@ -461,7 +462,7 @@
                     <button type="button" onclick="exportData('json')" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-bordercolor flex items-center gap-2 transition">
                         <i class="fa-solid fa-file-export"></i> Export JSON Backup
                     </button>
-                    <button type="button" onclick="document.getElementById('import-file-input').click()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-bordercolor flex items-center gap-2 transition">
+                    <button type="button" onclick="requestImportData()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-bordercolor flex items-center gap-2 transition">
                         <i class="fa-solid fa-file-import"></i> Import JSON or CSV
                     </button>
                     <input type="file" id="import-file-input" class="hidden" accept=".json,.csv" onchange="importData(event)">

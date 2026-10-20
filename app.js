@@ -1226,6 +1226,7 @@
                 const classColumn = headers.findIndex(header => /^(class|category|ride type)$/.test(header));
 
                 table.split(/^\|-/m).slice(1).forEach(row => {
+                    if (/\{\{\s*never operated\s*\}\}/i.test(row)) return;
                     const cells = [];
                     row.split(/\r?\n/).map(line => line.trim())
                         .filter(line => line.startsWith('|') && !line.startsWith('|}') && !line.startsWith('|+'))
@@ -1319,6 +1320,7 @@
                 prop: 'redirects',
                 titles: pageTitles.join('|'),
                 rdlimit: 'max',
+                redirects: 1,
                 format: 'json',
                 origin: '*'
             });
@@ -1344,6 +1346,7 @@
                     titles: pageTitles.slice(offset, offset + 50).join('|'),
                     rvprop: 'content',
                     rvslots: 'main',
+                    redirects: 1,
                     format: 'json',
                     origin: '*'
                 });
@@ -1436,7 +1439,11 @@
                     canonicalRide.entityType = 'Present coaster';
                 }
                 canonicalRide.name = parkName;
-                canonicalRide.variant = rides.some(ride => ride.variant === 'Relocated') ? 'Relocated' : 'Original';
+                canonicalRide.variant = rides.some(ride => ride.variant === 'Relocated')
+                    ? 'Relocated'
+                    : rides.some(ride => ride.variant === 'ElementChange')
+                        ? 'ElementChange'
+                        : 'Original';
                 canonicalRide.hasReimaginedVersion = false;
                 return canonicalRide;
             });
@@ -1634,6 +1641,7 @@
                 })
                 .join('\n');
             const historyTableText = historySections
+                .replace(/\[\[(?:File|Image):[^\r\n]*\]\]/gi, ' ')
                 .replace(/\{\|[\s\S]*?\|\}/g, table => table
                     .replace(/^\{\|.*$/gm, ' ')
                     .replace(/^\|-.*$/gm, '\n')
@@ -1647,6 +1655,7 @@
                     .replace(/'{2,}/g, ' '));
             const articleText = wikitext
                 .split(/^={2,}\s*(?:references|external links|further reading|notes)\s*={2,}\s*$/im)[0]
+                .replace(/\[\[(?:File|Image):[^\r\n]*\]\]/gi, ' ')
                 .concat(`\n${historyTableText}`)
                 .replace(/<!--[\s\S]*?-->/g, '')
                 .replace(/<ref\b[^>]*>[\s\S]*?<\/ref\s*>/gi, ' ')

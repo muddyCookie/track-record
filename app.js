@@ -1795,49 +1795,46 @@
             selectOfficialCoasterName(rideName);
         }
 
-        function setRideNameVersionOptions(ride = null) {
+        function setRideNameVersionOptions(ride = null, fallbackName = '', fallbackType = 'Real', fallbackVariant = 'Original') {
             rideNameVersionOptions = new Map();
             const select = document.getElementById('form-official-coaster-name');
             const nameInput = document.getElementById('form-coaster-name');
             if (!select) return;
-            if (!ride) {
-                select.replaceChildren();
-                select.classList.add('hidden');
-                nameInput.classList.remove('hidden');
-                nameInput.required = true;
-                return;
-            }
-
             const names = [
-                { name: ride.name, variant: normalizeRideVariant(ride.variant) },
-                ...(ride.historicalNames || []).map(name => ({ name, variant: 'Original' }))
+                ...(ride ? [
+                    { name: ride.name, variant: normalizeRideVariant(ride.variant) },
+                    ...(ride.historicalNames || []).map(name => ({ name, variant: 'Original' }))
+                ] : []),
+                ...(fallbackName ? [{ name: fallbackName, variant: normalizeRideVariant(fallbackVariant) }] : [])
             ];
             const options = [...new Map(names.map(option =>
                 [option.name.toLocaleLowerCase(), option]
             )).values()];
             options.forEach(({ name, variant }) => {
                 rideNameVersionOptions.set(name.toLocaleLowerCase(), {
-                    type: ride.type || 'Real',
+                    type: ride?.type || fallbackType,
                     variant
                 });
             });
-            select.innerHTML = [
-                ...options.map(({ name }) =>
-                    `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`
-                ),
-                '<option value="__custom__">Custom name…</option>'
-            ].join('');
-            select.classList.remove('hidden');
+            select.innerHTML = `<option value="">Choose a coaster name…</option>${options
+                .map(({ name }) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
+                .join('')}<option value="__custom__">Custom name…</option>`;
+            nameInput.value = '';
             nameInput.classList.add('hidden');
             nameInput.required = false;
-            select.value = options[0]?.name || '__custom__';
-            if (!options.length) selectOfficialCoasterName('__custom__');
+            select.value = '';
         }
 
         function selectOfficialCoasterName(name = '') {
             const select = document.getElementById('form-official-coaster-name');
             const nameInput = document.getElementById('form-coaster-name');
             const selectedName = name || select.value;
+            if (!selectedName) {
+                nameInput.value = '';
+                nameInput.classList.add('hidden');
+                nameInput.required = false;
+                return;
+            }
             if (selectedName === '__custom__' || !rideNameVersionOptions.has(selectedName.toLocaleLowerCase())) {
                 if (selectedName === '__custom__') nameInput.value = '';
                 select.value = '__custom__';
@@ -1929,8 +1926,13 @@
             const matchingRide = currentParkRides.find(ride =>
                 (ride.sourceRideId || ride.id) === entry.coasterpediaRideId
             );
-            setRideNameVersionOptions(matchingRide);
-            if (matchingRide) selectOfficialCoasterName(entry.coasterName || '');
+            setRideNameVersionOptions(
+                matchingRide,
+                entry.coasterName || '',
+                entry.type || 'Real',
+                rideEntryVariant(entry)
+            );
+            selectOfficialCoasterName(entry.coasterName || '__custom__');
 
             document.getElementById('modal-entry').classList.remove('hidden');
             return true;
@@ -1944,7 +1946,13 @@
             relogSourceEntryId = id;
             const now = new Date();
             if (rideDetails) {
-                document.getElementById('form-coaster-name').value = rideDetails.name;
+                setRideNameVersionOptions(
+                    currentParkRides.find(ride => (ride.sourceRideId || ride.id) === rideDetails.rideId),
+                    rideDetails.name,
+                    rideDetails.type,
+                    rideDetails.variant
+                );
+                selectOfficialCoasterName(rideDetails.name);
                 document.getElementById('form-coaster-ridden').value = '';
                 document.getElementById('form-ride-status').value = rideDetails.status;
                 document.getElementById('form-coaster-type').value = rideDetails.type;
@@ -1955,9 +1963,6 @@
                     rideDetails.openingDate || group.entry.coasterpediaOpeningDate || '';
                 document.getElementById('form-coasterpedia-closing-date').value =
                     rideDetails.closingDate || group.entry.coasterpediaClosingDate || '';
-                setRideNameVersionOptions(currentParkRides.find(ride =>
-                    (ride.sourceRideId || ride.id) === rideDetails.rideId
-                ));
             }
             document.getElementById('modal-entry-title').innerHTML = `<i class="fa-solid fa-rotate text-brand-500"></i> Relog Ride Entry`;
             document.getElementById('form-entry-submit').textContent = 'Save Relog';

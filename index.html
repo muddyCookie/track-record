@@ -441,8 +441,11 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Official Coaster Name *</label>
-                        <select id="form-official-coaster-name" onchange="selectOfficialCoasterName()" class="hidden w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500"></select>
-                        <input type="text" id="form-coaster-name" oninput="updateRelogNameVariant()" required placeholder="e.g. Top Thrill 2" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <select id="form-official-coaster-name" onchange="selectOfficialCoasterName()" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                            <option value="">Choose a coaster name…</option>
+                            <option value="__custom__">Custom name…</option>
+                        </select>
+                        <input type="text" id="form-coaster-name" oninput="updateRelogNameVariant()" placeholder="Enter coaster name" class="hidden mt-2 w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                         <p class="mt-1 text-[10px] text-slate-500">Choose a listed coaster name to set its ride type and version.</p>
                     </div>
                     <div>

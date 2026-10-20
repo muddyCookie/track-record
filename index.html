@@ -528,38 +528,37 @@
                 <p class="text-slate-400 mb-2">Choose which ride types and versions count toward Total. These settings change the total, not which entries appear in your log.</p>
 
                 <h4 class="pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Ride types</h4>
-                <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
-                    <span><span class="font-medium text-slate-200">Count powered coasters</span><span class="mt-1 block text-[10px] text-slate-500">Motor-driven rides, often smaller or kiddie coasters.</span></span>
-                    <input type="checkbox" id="rule-powered" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
+                <label class="flex items-center justify-between gap-4 p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
+                    <span><span class="font-medium text-slate-200">Count powered coasters</span><span class="mt-1 block text-[10px] text-slate-500">Motor-driven rides, such as Thunder Run.</span></span>
+                    <input type="checkbox" id="rule-powered" onchange="saveRules()" class="w-4 h-4 shrink-0 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
                 </label>
 
-                <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
-                    <span><span class="font-medium text-slate-200">Count alpine coasters</span><span class="mt-1 block text-[10px] text-slate-500">Mountain coaster rides, such as Park City Mountain Coaster.</span></span>
-                    <input type="checkbox" id="rule-alpine" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
+                <label class="flex items-center justify-between gap-4 p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
+                    <span><span class="font-medium text-slate-200">Count alpine coasters</span><span class="mt-1 block text-[10px] text-slate-500">Mountain coaster rides, such as Georgia Mountain Coaster.</span></span>
+                    <input type="checkbox" id="rule-alpine" onchange="saveRules()" class="w-4 h-4 shrink-0 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
                 </label>
 
-                <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
-                    <span><span class="font-medium text-slate-200">Count water coasters</span><span class="mt-1 block text-[10px] text-slate-500">Rides classified as water coasters, such as Journey to Atlantis.</span></span>
-                    <input type="checkbox" id="rule-water" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
+                <label class="flex items-center justify-between gap-4 p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
+                    <span><span class="font-medium text-slate-200">Count water coasters</span><span class="mt-1 block text-[10px] text-slate-500">Rides classified as water coasters, such as NightFlight Expedition.</span></span>
+                    <input type="checkbox" id="rule-water" onchange="saveRules()" class="w-4 h-4 shrink-0 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
                 </label>
 
                 <h4 class="pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Ride versions and changes</h4>
-                <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
-                    <span><span class="font-medium text-slate-200">Count reimagined / experience changes</span><span class="mt-1 block text-[10px] text-slate-500">Counts real experience changes: Iron Dragon VR, Mantis → Rougarou, or wood ↔ steel track. Not a rename/theme-only update (X → X2) or ordinary same-material retracking.</span></span>
-                    <input type="checkbox" id="rule-element-change" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
+                <label class="flex items-center justify-between gap-4 p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
+                    <span><span class="font-medium text-slate-200">Count reimagined / experience changes</span><span class="mt-1 block text-[10px] text-slate-500">Counts experience changes such as: Enclosing a ride (Avalanche Run → Disaster Transport), adding virtual reality (Iron Dragon VR), Stand-Up to Floorless (Apocalypse → Firebird), or wood to steel track (Predator). Not a rename/theme-only update (Intimidator 305 → Pantherian) or an ordinary same-material retracking.</span></span>
+                    <input type="checkbox" id="rule-element-change" onchange="saveRules()" class="w-4 h-4 shrink-0 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
                 </label>
 
-                <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
-                    <span><span class="font-medium text-slate-200">Count relocated coasters (no track / element changes)</span><span class="mt-1 block text-[10px] text-slate-500">For example, the same coaster moved to another park without a meaningful redesign.</span></span>
-                    <input type="checkbox" id="rule-relocated" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
+                <label class="flex items-center justify-between gap-4 p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
+                    <span><span class="font-medium text-slate-200">Count relocated coasters</span><span class="mt-1 block text-[10px] text-slate-500">There were no changes to the ride itself, only its location, theme or name (Ragin' Cajun → Barrels O' Fun).</span></span>
+                    <input type="checkbox" id="rule-relocated" onchange="saveRules()" class="w-4 h-4 shrink-0 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
                 </label>
 
                 <h4 class="pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Repeat rides</h4>
                 <label class="flex items-center justify-between gap-4 p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
-                    <span><span class="font-medium text-slate-200">Count relogs toward Total</span><span class="mt-1 block text-[10px] text-slate-500">For example, logging three Millennium Force laps adds three instead of one.</span></span>
+                    <span><span class="font-medium text-slate-200">Count relogs toward Total</span><span class="mt-1 block text-[10px] text-slate-500">When on, each recorded lap adds to the total. For example, logging three laps adds three logs instead of only one. When off, each coaster counts once even if you log multiple laps.</span></span>
                     <input type="checkbox" id="rule-count-relogs" onchange="saveRules()" class="w-4 h-4 shrink-0 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
                 </label>
-                <p class="-mt-1 text-[11px] text-slate-500">When off, each coaster counts once even if you log multiple laps. When on, each recorded lap adds to Total.</p>
 
                 <h4 class="pt-4 text-[11px] font-bold uppercase tracking-wider text-slate-500">Data</h4>
                 <div class="flex flex-wrap gap-2">

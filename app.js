@@ -1296,6 +1296,13 @@
             ).filter(Boolean);
         }
 
+        function extractCoasterpediaLinkedNames(value) {
+            const linkedNames = [...value.matchAll(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g)]
+                .flatMap(([, title, label]) => [title, label].filter(Boolean))
+                .map(name => cleanCoasterpediaCell(name));
+            return [...new Set([cleanCoasterpediaCell(value), ...linkedNames].filter(Boolean))];
+        }
+
         function classifyRideLabel(value) {
             const normalized = cleanCoasterpediaCell(value).toLowerCase();
             if (/\bpowered\b/.test(normalized)) return 'Powered';
@@ -1373,7 +1380,7 @@
                 ride.sourceRideId = canonicalTitle;
                 ride.id = canonicalTitle;
                 if (!details) return;
-                ride.variant = details.isFormerParkEntry
+                ride.variant = details.hasRelocatedHistory
                     ? 'Relocated'
                     : details.changeClassification === 'reimagined'
                         ? 'ElementChange'
@@ -1517,24 +1524,34 @@
                 };
             }).filter(item => item.name);
             const trackCount = infobox.match(/^\|tracks?\s*=\s*(\d+)/im);
-            const pastInfoboxes = [...wikitext.matchAll(/\{\{infobox past\b([\s\S]*?)^\}\}/gim)]
+            const pastInfoboxes = [...wikitext.matchAll(/\{\{\s*infobox past\b([\s\S]*?)^[ \t]*\}\}/gim)]
                 .map(match => {
                     const pastInfobox = match[1];
+                    const parkField = pastInfobox.match(/^[ \t]*\|park\s*=\s*(.+)$/im)?.[1] || '';
                     return {
-                        park: cleanCoasterpediaCell(pastInfobox.match(/^\|park\s*=\s*(.+)$/im)?.[1] || ''),
-                        name: cleanCoasterpediaCell(pastInfobox.match(/^\|name\s*=\s*(.+)$/im)?.[1] || ''),
+                        park: cleanCoasterpediaCell(parkField),
+                        parkNames: extractCoasterpediaLinkedNames(parkField),
+                        name: cleanCoasterpediaCell(pastInfobox.match(/^[ \t]*\|name\s*=\s*(.+)$/im)?.[1] || ''),
+                        opened: cleanCoasterpediaCell(pastInfobox.match(/^[ \t]*\|opened\s*=\s*(.+)$/im)?.[1] || ''),
                         wikitext: pastInfobox
                     };
                 });
             const parkNameKey = selectedParkName.toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
-            const mainPark = cleanCoasterpediaCell(infobox.match(/^\|park\s*=\s*(.+)$/im)?.[1] || '');
+            const mainParkField = infobox.match(/^[ \t]*\|park\s*=\s*(.+)$/im)?.[1] || '';
+            const mainPark = cleanCoasterpediaCell(mainParkField);
+            const mainParkOpened = cleanCoasterpediaCell(infobox.match(/^[ \t]*\|opened\s*=\s*(.+)$/im)?.[1] || '');
             const mainParkKey = mainPark.toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
             const currentName = nameHistory.find(item => /present|current/i.test(item.to))?.name ||
                 nameHistory.at(-1)?.name ||
                 infoboxName;
-            const mainParkMatches = Boolean(parkNameKey && mainParkKey === parkNameKey);
+            const mainParkMatches = Boolean(parkNameKey &&
+                (mainParkKey === parkNameKey || extractCoasterpediaLinkedNames(mainParkField)
+                    .some(name => name.toLocaleLowerCase().replace(/[^a-z0-9]/g, '') === parkNameKey)));
             const pastNamesAtPark = pastInfoboxes
-                .filter(item => parkNameKey && item.park.toLocaleLowerCase().replace(/[^a-z0-9]/g, '') === parkNameKey)
+                .filter(item => parkNameKey && (
+                    item.park.toLocaleLowerCase().replace(/[^a-z0-9]/g, '') === parkNameKey ||
+                    item.parkNames.some(name => name.toLocaleLowerCase().replace(/[^a-z0-9]/g, '') === parkNameKey)
+                ))
                 .map(item => item.name)
                 .filter(Boolean);
             const pastNameFieldNames = extractCoasterpediaPastNames(infobox);
@@ -1542,7 +1559,8 @@
                 ? currentName
                 : pastNamesAtPark.at(-1) || '';
             const namesRecordedAtOtherParks = new Set(pastInfoboxes
-                .filter(item => item.park.toLocaleLowerCase().replace(/[^a-z0-9]/g, '') !== parkNameKey)
+                .filter(item => item.park.toLocaleLowerCase().replace(/[^a-z0-9]/g, '') !== parkNameKey &&
+                    !item.parkNames.some(name => name.toLocaleLowerCase().replace(/[^a-z0-9]/g, '') === parkNameKey))
                 .map(item => item.name.toLocaleLowerCase()));
             const historicalNamesForPark = [...new Set([
                 ...(mainParkMatches
@@ -1561,6 +1579,8 @@
             const pastParkInfobox = pastInfoboxes.find(item =>
                 item.park.toLocaleLowerCase().replace(/[^a-z0-9]/g, '') === parkNameKey
             );
+            const hasOperatedAt = opened => Boolean(opened) &&
+                !/\b(?:never operated|never opened|not opened|planned|cancelled|canceled)\b/i.test(opened);
             const dateInfobox = mainParkMatches
                 ? infobox
                 : pastParkInfobox?.wikitext || '';
@@ -1585,10 +1605,12 @@
                 historicalNamesForPark,
                 sameVariationNamesForPark,
                 variationChangeNamesForPark: variationChangeNames,
+                hasRelocatedHistory: mainParkMatches && hasOperatedAt(mainParkOpened) &&
+                    pastInfoboxes.some(item => item.parkNames.length > 0 && hasOperatedAt(item.opened)),
                 isFormerParkEntry: Boolean(!mainParkMatches && pastNamesAtPark.length),
                 tracks: trackCount ? Number(trackCount[1]) : 1,
-                openingDate: parseCoasterpediaDate(dateInfobox.match(/^\|opened\s*=\s*(.+)$/im)?.[1] || ''),
-                closingDate: parseCoasterpediaDate(dateInfobox.match(/^\|closed\s*=\s*(.+)$/im)?.[1] || ''),
+                openingDate: parseCoasterpediaDate(dateInfobox.match(/^[ \t]*\|opened\s*=\s*(.+)$/im)?.[1] || ''),
+                closingDate: parseCoasterpediaDate(dateInfobox.match(/^[ \t]*\|closed\s*=\s*(.+)$/im)?.[1] || ''),
                 changeClassification,
                 changeEvidence: changeEvidence.find(item => item.type === 'major')?.text ||
                     changeEvidence.find(item => item.type === 'track')?.text ||
@@ -1821,9 +1843,11 @@
                                 <div class="flex min-w-0 items-center gap-2 flex-wrap">
                                     <a href="${articleUrl}" target="_blank" rel="noopener noreferrer" class="truncate text-sm font-semibold text-slate-100 hover:text-brand-400">${escapeHtml(ride.name)}</a>
                                     <span class="rounded-md border border-brand-500/20 bg-brand-500/10 px-2 py-0.5 text-[10px] font-semibold text-brand-300">${escapeHtml(rideType)}</span>
+                                    ${variant === 'ElementChange' || variant === 'Relocated'
+                                        ? `<span class="rounded-md border ${variant === 'ElementChange' ? 'border-violet-500/20 bg-violet-500/10 text-violet-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-300'} px-2 py-0.5 text-[10px] font-semibold">${escapeHtml(rideVariantLabel(variant))}</span>`
+                                        : ''}
                                 </div>
                                 ${ride.historicalNames?.length ? `<p class="mt-1 text-[11px] text-slate-500">Previously known as ${ride.historicalNames.map(escapeHtml).join(', ')}</p>` : ''}
-                                ${variant === 'ElementChange' ? `<span class="mt-1 inline-block rounded-md border border-violet-500/20 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold text-violet-300">${escapeHtml(rideVariantLabel(variant))}</span>` : ''}
                                 ${ride.hasReimaginedVersion ? `<p class="mt-1 text-[11px] text-violet-300">Coasterpedia history indicates a substantial ride change${ride.changeYear ? ` around ${escapeHtml(ride.changeYear)}` : ''}; you can log the reimagined version separately.</p>` : ''}
                                 ${dateLabel}
                                 ${sameNameRideCount > 1 && matchingParkEntries.some(entry => !entry.coasterpediaRideId)

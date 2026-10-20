@@ -419,6 +419,26 @@
             return labels[normalizedVariant] || normalizedVariant;
         }
 
+        function rideVersionVariantForName(ride, name = '') {
+            const normalizedName = name.toLocaleLowerCase();
+            const baseVariant = normalizeRideVariant(ride?.variant);
+            if (!ride || !normalizedName) return baseVariant;
+            if ((ride.name || '').toLocaleLowerCase() === normalizedName) return baseVariant;
+            if ((ride.variationChangeNames || []).some(item => item.toLocaleLowerCase() === normalizedName)) {
+                return ride.hasRelocatedHistory ? 'Relocated' : 'Original';
+            }
+            return baseVariant;
+        }
+
+        function displayRideNameForSearch(ride, searchVal = '') {
+            if (!searchVal || ride.name.toLocaleLowerCase().includes(searchVal)) return ride.name;
+            return [
+                ...(ride.variationChangeNames || []),
+                ...(ride.sameVariationNames || []),
+                ...(ride.historicalNames || [])
+            ].find(name => name.toLocaleLowerCase().includes(searchVal)) || ride.name;
+        }
+
         function rideIdentityKey(entry) {
             const coasterName = entry.coasterName || entry.coasterNameRidden || '';
             const isMinorAlias = isMinorRideNameAlias(coasterName);
@@ -1380,12 +1400,13 @@
                 ride.sourceRideId = canonicalTitle;
                 ride.id = canonicalTitle;
                 if (!details) return;
-                ride.variant = details.hasRelocatedHistory
-                    ? 'Relocated'
-                    : details.changeClassification === 'reimagined'
-                        ? 'ElementChange'
+                ride.variant = details.changeClassification === 'reimagined'
+                    ? 'ElementChange'
+                    : details.hasRelocatedHistory
+                        ? 'Relocated'
                         : 'Original';
                 ride.hasReimaginedVersion = false;
+                ride.hasRelocatedHistory = details.hasRelocatedHistory;
                 ride.openingDate = details.openingDate;
                 ride.closingDate = details.closingDate;
                 ride.nameHistory = details.nameHistory;
@@ -1448,11 +1469,12 @@
                     canonicalRide.entityType = 'Present coaster';
                 }
                 canonicalRide.name = parkName;
-                canonicalRide.variant = rides.some(ride => ride.variant === 'Relocated')
-                    ? 'Relocated'
-                    : rides.some(ride => ride.variant === 'ElementChange')
+                canonicalRide.hasRelocatedHistory = rides.some(ride => ride.hasRelocatedHistory || ride.variant === 'Relocated');
+                canonicalRide.variant = rides.some(ride => ride.variant === 'ElementChange')
                         ? 'ElementChange'
-                        : 'Original';
+                        : canonicalRide.hasRelocatedHistory
+                            ? 'Relocated'
+                            : 'Original';
                 canonicalRide.hasReimaginedVersion = false;
                 return canonicalRide;
             });
@@ -1622,7 +1644,9 @@
                             .match(/\b(?:18|19|20)\d{2}\b/)?.[0] ||
                         ''
                     : '',
-                hasReimaginedVersion: changeClassification === 'reimagined' && nameHistory.length < 2
+                hasReimaginedVersion: changeClassification === 'reimagined' && nameHistory.length < 2,
+                hasRelocatedHistory: mainParkMatches && hasOperatedAt(mainParkOpened) &&
+                    pastInfoboxes.some(item => item.parkNames.length > 0 && hasOperatedAt(item.opened))
             };
         }
 

@@ -440,12 +440,7 @@
         }
 
         function cleanRideFormerNames(names = [], currentName = '') {
-            const currentKey = currentName.toLocaleLowerCase();
-            return [...new Map(names
-                .map(cleanCoasterpediaFormerName)
-                .filter(name => isLikelyCoasterFormerName(name) && name.toLocaleLowerCase() !== currentKey)
-                .map(name => [name.toLocaleLowerCase(), name])
-            ).values()];
+            return cleanCoasterpediaFormerNameList(names, currentName);
         }
 
         function rideFormerNames(ride, key = 'historicalNames') {
@@ -1337,7 +1332,7 @@
             const normalized = value.toLocaleLowerCase();
             if (!value || !/[a-z0-9]/i.test(value)) return false;
             if (!/(?:^|[\s'&.-])(?:[A-Z][a-zA-Z0-9]*|[A-Z0-9]{2,})(?:$|[\s'&.-])|\d/.test(value)) return false;
-            if (/^(?:it|its|itself|they|them|this|that|he|she|we|ride|coaster|roller coaster|attraction|train|track|layout|name|theme|area|park)$/i.test(value)) return false;
+            if (/^(?:it|its|itself|they|them|this|that|these|those|he|she|we|ride|coaster|roller coaster|attraction|train|track|layout|name|theme|area|park)$/i.test(value)) return false;
             if (/^(?:the|a|an)\s+(?:ride|coaster|roller coaster|attraction|train|track|layout|name|theme|area|park)$/i.test(value)) return false;
             if (/^(?:was|were|is|are|would|will|could|should|opened|closed|renamed|relocated)\b/i.test(value)) return false;
             if (/^(?:operating|closed|removed|relocated|unknown|present|current)$/i.test(value)) return false;
@@ -1346,6 +1341,15 @@
             if (/^(?:18|19|20)\d{2}(?:\s*[^a-z0-9\s]\s*(?:(?:18|19|20)\d{2}|present|current))?$/i.test(value)) return false;
             if (value.length < 2 && !/^[A-Z0-9]$/.test(value)) return false;
             return normalized.length > 1 || /^[A-Z0-9]$/.test(value);
+        }
+
+        function cleanCoasterpediaFormerNameList(names = [], currentName = '') {
+            const currentKey = currentName.toLocaleLowerCase();
+            return [...new Map(names
+                .map(cleanCoasterpediaFormerName)
+                .filter(name => isLikelyCoasterFormerName(name) && name.toLocaleLowerCase() !== currentKey)
+                .map(name => [name.toLocaleLowerCase(), name])
+            ).values()];
         }
 
         function extractCoasterpediaPastNames(infobox) {
@@ -1378,8 +1382,8 @@
                 .replace(/\s+/g, ' '));
             const currentNamePattern = escapeRegExp(currentName);
             const patterns = [
-                /\b(?:opened|debuted)\b[^.!?]{0,120}\bas\s+([A-Z][A-Za-z0-9 '&.-]{1,80}?)(?=\s+(?:in|on|at|before|after|when|for|but|and|\.|,)|[.!?])/gi,
-                /\boriginally\s+(?:known\s+as|called|named)\s+([A-Z][A-Za-z0-9 '&.-]{1,80}?)(?=\s+(?:in|on|at|before|after|when|for|but|and|\.|,)|[.!?])/gi
+                /\b(?:opened|debuted)\b[^.!?]{0,80}\bas\s+([A-Z][A-Za-z0-9'&.-]*(?:\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})(?=\s+(?:in|on|at|before|after|when|for|but|and|\.|,)|[.!?])/g,
+                /\boriginally\s+(?:known\s+as|called|named)\s+([A-Z][A-Za-z0-9'&.-]*(?:\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})(?=\s+(?:in|on|at|before|after|when|for|but|and|\.|,)|[.!?])/g
             ];
             if (currentNamePattern) {
                 patterns.push(new RegExp(`\\b([A-Z][A-Za-z0-9'&.-]*(?:\\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})\\s+(?:was|would be|became|got)\\s+renamed\\s+${currentNamePattern}\\b`, 'g'));
@@ -1390,6 +1394,19 @@
                     .replace(/\s+(?:was|were|is|are|would|will|could|should)\b.*$/i, '')
                     .trim())
             ).filter(name => isLikelyCoasterFormerName(name) && name.toLocaleLowerCase() !== currentName.toLocaleLowerCase()))];
+        }
+
+        function extractCoasterpediaBoldFormerNames(wikitext, currentName = '') {
+            const leadText = wikitext
+                .split(/^={2,}.*$/m)[0]
+                .replace(/<ref\b[^>]*>[\s\S]*?<\/ref\s*>/gi, ' ')
+                .replace(/<ref\b[^>]*\/\s*>/gi, ' ');
+            const explicitLeadHasAliases = /\b(?:formerly|previously|originally|known as|opened as|renamed)\b/i.test(leadText);
+            if (!explicitLeadHasAliases) return [];
+            return cleanCoasterpediaFormerNameList(
+                [...leadText.matchAll(/'''([^']{2,80})'''/g)].map(match => match[1]),
+                currentName
+            );
         }
 
         function extractCoasterpediaNameSectionFormerNames(wikitext, currentName = '') {
@@ -1474,10 +1491,16 @@
 
             const redirectData = await redirectResponse.json();
             const canonicalTitleByAlias = new Map();
+            const redirectAliasesByCanonicalTitle = new Map();
             Object.values(redirectData.query?.pages || {}).forEach(page => {
                 canonicalTitleByAlias.set(page.title.toLocaleLowerCase(), page.title);
+                const canonicalKey = page.title.toLocaleLowerCase();
+                if (!redirectAliasesByCanonicalTitle.has(canonicalKey)) {
+                    redirectAliasesByCanonicalTitle.set(canonicalKey, []);
+                }
                 (page.redirects || []).forEach(redirect => {
                     canonicalTitleByAlias.set(redirect.title.toLocaleLowerCase(), page.title);
+                    redirectAliasesByCanonicalTitle.get(canonicalKey).push(redirect.title);
                 });
             });
 
@@ -1510,6 +1533,7 @@
             currentParkRides.forEach(ride => {
                 const canonicalTitle = canonicalTitleByAlias.get(ride.pageTitle.toLocaleLowerCase()) || ride.pageTitle;
                 const details = articlesByTitle.get(canonicalTitle.toLocaleLowerCase());
+                const redirectAliases = redirectAliasesByCanonicalTitle.get(canonicalTitle.toLocaleLowerCase()) || [];
                 ride.pageTitle = canonicalTitle;
                 ride.sourceRideId = canonicalTitle;
                 ride.id = canonicalTitle;
@@ -1525,10 +1549,16 @@
                 ride.closingDate = details.closingDate;
                 ride.nameHistory = details.nameHistory;
                 ride.currentName = details.currentName;
-                ride.historicalNames = cleanRideFormerNames(details.historicalNamesForPark, details.parkSpecificName || ride.name);
-                ride.sameVariationNames = cleanRideFormerNames(details.sameVariationNamesForPark, details.parkSpecificName || ride.name);
-                ride.variationChangeNames = cleanRideFormerNames(details.variationChangeNamesForPark, details.parkSpecificName || ride.name);
                 if (details.parkSpecificName) ride.name = details.parkSpecificName;
+                ride.historicalNames = cleanRideFormerNames([
+                    ...details.historicalNamesForPark,
+                    ...redirectAliases
+                ], details.parkSpecificName || ride.name);
+                ride.sameVariationNames = cleanRideFormerNames([
+                    ...details.sameVariationNamesForPark,
+                    ...(details.changeClassification === 'reimagined' ? [] : redirectAliases)
+                ], details.parkSpecificName || ride.name);
+                ride.variationChangeNames = cleanRideFormerNames(details.variationChangeNamesForPark, details.parkSpecificName || ride.name);
                 if (details.tracks < 2) return;
                 ride.trackCount = details.tracks;
                 ride.trackNames = details.tracks === 2 && ride.name.toLowerCase() === 'gemini'
@@ -1694,6 +1724,7 @@
                 .filter(Boolean);
             const pastNameFieldNames = extractCoasterpediaPastNames(infobox);
             const nameSectionNames = extractCoasterpediaNameSectionFormerNames(wikitext, currentName);
+            const boldFormerNames = extractCoasterpediaBoldFormerNames(wikitext, currentName);
             const historyFormerNames = extractCoasterpediaHistoryFormerNames(wikitext, currentName);
             const parkSpecificName = mainParkMatches
                 ? currentName
@@ -1707,6 +1738,7 @@
                         ...nameHistory.map(item => item.name),
                         ...pastNameFieldNames,
                         ...nameSectionNames,
+                        ...boldFormerNames,
                         ...historyFormerNames
                     ].filter(name =>
                         name.toLocaleLowerCase() !== currentName.toLocaleLowerCase() &&

@@ -432,7 +432,7 @@
                         <input type="text" id="form-park-name" placeholder="e.g. Kings Island (leave blank for a standalone ride)" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-400 mb-1">Park Name WHEN RIDDEN <span class="text-slate-500 font-normal">(Historic)</span></label>
+                        <label class="block font-semibold text-slate-400 mb-1">Park Name When Ridden <span class="text-slate-500 font-normal">(Historic)</span></label>
                         <input type="text" id="form-park-ridden" placeholder="e.g. Paramount's Kings Island" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                     </div>
                 </div>
@@ -441,14 +441,13 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Official Coaster Name *</label>
-                        <select id="form-official-coaster-name" onchange="selectOfficialCoasterName()" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
-                            <option value="__custom__">Custom name…</option>
-                        </select>
-                        <input type="text" id="form-coaster-name" oninput="updateRelogNameVariant()" placeholder="Enter coaster name" class="hidden mt-2 w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
-                        <p class="mt-1 text-[10px] text-slate-500">Choose a listed coaster name to set its ride type and version.</p>
+                        <input type="text" id="form-coaster-name" oninput="updateRelogNameVariant(); syncCoasterNameWhenRidden()" placeholder="Enter official coaster name" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Coaster Name When Ridden</label>
+                        <input type="text" id="form-coaster-ridden" placeholder="Name used when you rode it" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                     </div>
                 </div>
-                <input type="hidden" id="form-coaster-ridden">
 
                 <!-- Classification Row -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -579,6 +578,6 @@
     </div>
 
     <script type="module" src="firebase-cloud.js"></script>
-    <script src="app.js?v=coaster-section-status-hierarchy-20261021-4" defer></script>
+    <script src="app.js?v=official-coaster-name-when-ridden-20261021-5" defer></script>
 </body>
 </html>

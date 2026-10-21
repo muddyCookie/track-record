@@ -994,12 +994,8 @@
 
             for (const heading of headings) {
                 if (heading.level === 2) {
-                    era = /^(present|current|operating)$/i.test(heading.title)
-                        ? 'Present'
-                        : /^(past|former|defunct)$/i.test(heading.title)
-                            ? 'Former'
-                            : null;
-                    if (/^(?:present|current|operating|past|former|defunct)\s+(?:roller\s+)?coasters$/i.test(heading.title) ||
+                    era = coasterpediaCoasterEra(heading.title);
+                    if (coasterpediaCoasterListHeadingEra(heading.title) ||
                         /^(?:roller\s+)?coasters?$/i.test(heading.title)) {
                         return true;
                     }
@@ -1011,6 +1007,17 @@
             }
 
             return false;
+        }
+
+        function coasterpediaCoasterEra(heading) {
+            if (/^(?:present|current|operating|standing but not operating|under construction|under refurbishment|in storage|temporarily closed)$/i.test(heading)) return 'Present';
+            if (/^(?:past|former|defunct)$/i.test(heading)) return 'Former';
+            return null;
+        }
+
+        function coasterpediaCoasterListHeadingEra(heading) {
+            const match = heading.match(/^(.+?)\s+(?:roller\s+)?coasters?$/i);
+            return match ? coasterpediaCoasterEra(match[1].trim()) : null;
         }
 
         function renderCoasterpediaParkResults() {
@@ -1213,15 +1220,10 @@
             sections.forEach(section => {
                 const heading = section.line.trim();
                 if (section.hLevel === 2) {
-                    era = /^(present|current|operating)$/i.test(heading)
-                        ? 'Present'
-                        : /^(past|former|defunct)$/i.test(heading)
-                            ? 'Former'
-                            : null;
-                    if (/^(present|current|operating)\s+(?:roller\s+)?coasters$/i.test(heading)) {
-                        coasterSections.push({ index: section.index, status: 'Present' });
-                    } else if (/^(past|former|defunct)\s+(?:roller\s+)?coasters$/i.test(heading)) {
-                        coasterSections.push({ index: section.index, status: 'Former' });
+                    era = coasterpediaCoasterEra(heading);
+                    const directEra = coasterpediaCoasterListHeadingEra(heading);
+                    if (directEra) {
+                        coasterSections.push({ index: section.index, status: directEra });
                     } else if (/^(?:roller\s+)?coasters?$/i.test(heading)) {
                         coasterSections.push({ index: section.index, status: 'Present' });
                     }
@@ -1442,11 +1444,18 @@
             const currentNamePattern = escapeRegExp(currentName);
             const patterns = [
                 /\b(?:opened|debuted)\b[^.!?]{0,80}\bas\s+([A-Z][A-Za-z0-9'&.-]*(?:\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})(?=\s+(?:in|on|at|before|after|when|for|but|and|\.|,)|[.!?])/g,
-                /\b(?:formerly|previously|originally)\s+(?:known\s+as|called|named)\s+([A-Z][A-Za-z0-9'&.-]*(?:\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})(?=\s+(?:in|on|at|before|after|when|for|but|and|\.|,)|[.!?])/g,
+                /\b(?:formerly|previously|originally)\s+(?:known\s+as|called|named|referred\s+to\s+as)\s+["“]?([A-Z][A-Za-z0-9'&.-]*(?:\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})(?=["”]?\s+(?:in|on|at|before|after|when|for|but|and|until|during|from|between|\.|,)|[.!?])/g,
+                /\b(?:was|were|is|are)\s+(?:also\s+)?(?:known\s+as|called|named|referred\s+to\s+as)\s+["“]?([A-Z][A-Za-z0-9'&.-]*(?:\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})(?=["”]?\s+(?:in|on|at|before|after|when|for|but|and|until|during|from|between|\.|,)|[.!?])/g,
+                /\b(?:went\s+by|bore\s+the\s+name)\s+["“]?([A-Z][A-Za-z0-9'&.-]*(?:\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})(?=["”]?\s+(?:in|on|at|before|after|when|for|but|and|until|during|from|between|\.|,)|[.!?])/g,
+                /\bwas named\s+["“]?[A-Z][A-Za-z0-9'&.-]*(?:\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4}["”]?\s+until\s+(?:it|the ride|the coaster)\s+was changed to\s+["“]?([A-Z][A-Za-z0-9'&.-]*(?:\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})(?=\s+(?:in|on|at|for|during|before|after|the)\b|[.!?,]|$)/g,
+                /\b(?:renamed|changed)\s+(?:its\s+)?name\s+from\s+([A-Z][A-Za-z0-9'&.-]*(?:\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})\s+to\b/g,
                 /\b(?:renamed|changed)\s+from\s+([A-Z][A-Za-z0-9'&.-]*(?:\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})\s+to\b/g
             ];
             if (currentNamePattern) {
+                patterns.push(new RegExp(`\\b${currentNamePattern}\\s*\\(\\s*(?:also\\s+)?(?:known as|called|named)\\s+([A-Z][A-Za-z0-9'&.-]*(?:\\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})\\s*\\)`, 'g'));
+                patterns.push(new RegExp(`\\b((?:[A-Z][A-Za-z0-9'&.-]*)(?:\\s+[A-Z][A-Za-z0-9'&.-]*){0,4})\\s+was\\b[^.!?]{0,80}\\brenamed\\s+(?:to\\s+|as\\s+)?${currentNamePattern}\\b`, 'g'));
                 patterns.push(new RegExp(`\\b([A-Z][A-Za-z0-9'&.-]*(?:\\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})\\s+(?:was|would be|became|got)\\s+renamed\\s+${currentNamePattern}\\b`, 'g'));
+                patterns.push(new RegExp(`\\b([A-Z][A-Za-z0-9'&.-]*(?:\\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})\\s+(?:was|is)\\s+(?:formerly\\s+)?(?:known as|called|named)\\s+${currentNamePattern}\\b`, 'g'));
             }
             return [...new Set(patterns.flatMap(pattern =>
                 [...articleText.matchAll(pattern)].map(match => cleanCoasterpediaFormerName(match[1])
@@ -1771,7 +1780,7 @@
                 : structuredSectionNames.length
                     ? structuredSectionNames
                     : infoboxNameHistoryNames;
-            const fallbackFormerNames = structuredPastNames.length
+            const articleFormerNames = structuredPastNames.length
                 ? []
                 : extractCoasterpediaFallbackFormerNames(wikitext, currentName);
             const parkSpecificName = mainParkMatches
@@ -1785,7 +1794,7 @@
                 ...(mainParkMatches
                     ? [
                         ...structuredPastNames,
-                        ...fallbackFormerNames
+                        ...articleFormerNames
                     ].filter(name =>
                         name.toLocaleLowerCase() !== currentName.toLocaleLowerCase() &&
                         !namesRecordedAtOtherParks.has(name.toLocaleLowerCase())

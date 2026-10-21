@@ -1756,12 +1756,14 @@
                 .filter(matchesSelectedPark)
                 .map(item => item.name)
                 .filter(Boolean);
-            const pastNameFieldNames = extractCoasterpediaPastNamesParsed(infobox);
+            const pastNameFieldNames = cleanCoasterpediaFormerNameList([
+                ...extractCoasterpediaPastNames(infobox),
+                ...extractCoasterpediaPastNamesParsed(infobox)
+            ], currentName);
             const nameSectionNames = extractCoasterpediaNameSectionFormerNames(wikitext, currentName);
-            const structuredPastNames = cleanCoasterpediaFormerNameList(
-                pastNameFieldNames.length ? pastNameFieldNames : nameSectionNames,
-                currentName
-            );
+            const structuredSectionNames = cleanCoasterpediaFormerNameList(nameSectionNames, currentName);
+            const structuredPastNames = pastNameFieldNames.length ?
+                pastNameFieldNames : structuredSectionNames;
             const fallbackFormerNames = structuredPastNames.length
                 ? []
                 : extractCoasterpediaFallbackFormerNames(wikitext, currentName);

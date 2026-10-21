@@ -469,6 +469,12 @@
                             <option value="ElementChange">Reimagined / experience change</option>
                             <option value="Relocated">Relocated</option>
                         </select>
+                        <div id="form-duplicate-row" class="hidden mt-3">
+                            <label class="inline-flex items-center gap-2 text-slate-400 cursor-pointer">
+                                <input type="checkbox" id="form-is-duplicate" class="h-4 w-4 rounded border-bordercolor bg-slate-800 text-violet-500 focus:ring-violet-500">
+                                <span class="font-semibold">Duplicate</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -497,13 +503,6 @@
                         <input type="number" id="form-ride-count" min="1" value="1" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                     </div>
                 </div>
-                <div id="form-duplicate-row" class="hidden">
-                    <label class="inline-flex items-center gap-2 text-slate-400 cursor-pointer">
-                        <input type="checkbox" id="form-is-duplicate" class="h-4 w-4 rounded border-bordercolor bg-slate-800 text-violet-500 focus:ring-violet-500">
-                        <span class="font-semibold">Duplicate</span>
-                    </label>
-                </div>
-
                 <!-- Notes Field -->
                 <div>
                     <label class="block font-semibold text-slate-300 mb-1">Notes / Experience Details</label>
@@ -585,6 +584,6 @@
     </div>
 
     <script type="module" src="firebase-cloud.js"></script>
-    <script src="app.js?v=duplicate-edit-checkbox-20261021-13" defer></script>
+    <script src="app.js?v=duplicate-edit-checkbox-20261021-14" defer></script>
 </body>
 </html>

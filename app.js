@@ -2251,7 +2251,6 @@
             relogSourceEntryId = '';
             relogInitialCoasterName = '';
             relogVersionManuallySelected = false;
-            document.getElementById('form-duplicate-row').classList.add('hidden');
             setRideNameVersionOptions();
             document.getElementById('modal-entry-title').innerHTML = `<i class="fa-solid fa-pen-to-square text-brand-500"></i> Add Log Entry`;
             document.getElementById('form-entry-submit').textContent = 'Save Ride Entry';
@@ -2288,7 +2287,6 @@
             relogSourceEntryId = '';
             relogInitialCoasterName = '';
             relogVersionManuallySelected = false;
-            document.getElementById('form-duplicate-row').classList.remove('hidden');
             const group = getCoasterLogGroups().find(item => item.entries.some(entry => entry.id === id));
             const entry = group?.entry;
             if (!entry) return false;

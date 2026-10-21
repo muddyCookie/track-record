@@ -1311,6 +1311,7 @@
 
         function cleanCoasterpediaFormerName(value = '') {
             return cleanCoasterpediaCell(value)
+                .replace(/\s*\([^)]*\)\s*$/i, '')
                 .replace(/\s*\((?:18|19|20)\d{2}\s*[-â€“â€”]\s*(?:(?:18|19|20)\d{2}|present|current)?\)\s*$/i, '')
                 .replace(/\s*\((?:formerly|previously|past name)\)\s*$/i, '')
                 .replace(/\s+(?:formerly|previously)\s+.+$/i, '')
@@ -1422,12 +1423,12 @@
                     .replace(/<ref\b[^>]*\/\s*>/gi, ' ')
                     .replace(/\{\{[^{}]*\}\}/g, ' ');
 
-                names.push(...[...sectionContent.matchAll(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g)]
-                    .map(([, title, label]) => cleanCoasterpediaFormerName(label || title)));
-
                 sectionContent.split(/\r?\n/).forEach(line => {
                     const trimmed = line.trim();
                     if (!trimmed || /^(?:\{\||\|\}|\|-|!|caption\b)/i.test(trimmed)) return;
+                    const isStructuredNameLine = /^[*#;|]/.test(trimmed) ||
+                        /^(?:past name|former name|previous name|name)\s*[:=]/i.test(trimmed);
+                    if (!isStructuredNameLine) return;
                     const cells = trimmed
                         .replace(/^[*#;:\s|!]+/, '')
                         .split(/\|\||!!/)
@@ -1491,16 +1492,10 @@
 
             const redirectData = await redirectResponse.json();
             const canonicalTitleByAlias = new Map();
-            const redirectAliasesByCanonicalTitle = new Map();
             Object.values(redirectData.query?.pages || {}).forEach(page => {
                 canonicalTitleByAlias.set(page.title.toLocaleLowerCase(), page.title);
-                const canonicalKey = page.title.toLocaleLowerCase();
-                if (!redirectAliasesByCanonicalTitle.has(canonicalKey)) {
-                    redirectAliasesByCanonicalTitle.set(canonicalKey, []);
-                }
                 (page.redirects || []).forEach(redirect => {
                     canonicalTitleByAlias.set(redirect.title.toLocaleLowerCase(), page.title);
-                    redirectAliasesByCanonicalTitle.get(canonicalKey).push(redirect.title);
                 });
             });
 
@@ -1533,7 +1528,6 @@
             currentParkRides.forEach(ride => {
                 const canonicalTitle = canonicalTitleByAlias.get(ride.pageTitle.toLocaleLowerCase()) || ride.pageTitle;
                 const details = articlesByTitle.get(canonicalTitle.toLocaleLowerCase());
-                const redirectAliases = redirectAliasesByCanonicalTitle.get(canonicalTitle.toLocaleLowerCase()) || [];
                 ride.pageTitle = canonicalTitle;
                 ride.sourceRideId = canonicalTitle;
                 ride.id = canonicalTitle;
@@ -1550,14 +1544,8 @@
                 ride.nameHistory = details.nameHistory;
                 ride.currentName = details.currentName;
                 if (details.parkSpecificName) ride.name = details.parkSpecificName;
-                ride.historicalNames = cleanRideFormerNames([
-                    ...details.historicalNamesForPark,
-                    ...redirectAliases
-                ], details.parkSpecificName || ride.name);
-                ride.sameVariationNames = cleanRideFormerNames([
-                    ...details.sameVariationNamesForPark,
-                    ...(details.changeClassification === 'reimagined' ? [] : redirectAliases)
-                ], details.parkSpecificName || ride.name);
+                ride.historicalNames = cleanRideFormerNames(details.historicalNamesForPark, details.parkSpecificName || ride.name);
+                ride.sameVariationNames = cleanRideFormerNames(details.sameVariationNamesForPark, details.parkSpecificName || ride.name);
                 ride.variationChangeNames = cleanRideFormerNames(details.variationChangeNamesForPark, details.parkSpecificName || ride.name);
                 if (details.tracks < 2) return;
                 ride.trackCount = details.tracks;

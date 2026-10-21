@@ -1762,8 +1762,15 @@
             ], currentName);
             const nameSectionNames = extractCoasterpediaNameSectionFormerNames(wikitext, currentName);
             const structuredSectionNames = cleanCoasterpediaFormerNameList(nameSectionNames, currentName);
-            const structuredPastNames = pastNameFieldNames.length ?
-                pastNameFieldNames : structuredSectionNames;
+            const infoboxNameHistoryNames = cleanCoasterpediaFormerNameList(
+                nameHistory.map(item => item.name),
+                currentName
+            );
+            const structuredPastNames = pastNameFieldNames.length
+                ? pastNameFieldNames
+                : structuredSectionNames.length
+                    ? structuredSectionNames
+                    : infoboxNameHistoryNames;
             const fallbackFormerNames = structuredPastNames.length
                 ? []
                 : extractCoasterpediaFallbackFormerNames(wikitext, currentName);

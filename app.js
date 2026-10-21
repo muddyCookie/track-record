@@ -723,6 +723,9 @@
                             <div class="flex items-center gap-2 flex-wrap">
                                 <h4 class="text-base font-bold text-white">${escapeHtml(entry.coasterName)}</h4>
                             </div>
+                            ${entry.coasterNameRidden && entry.coasterNameRidden !== entry.coasterName
+                                ? `<p class="text-[11px] text-slate-400">Ridden as: ${escapeHtml(entry.coasterNameRidden)}</p>`
+                                : ''}
                             <div class="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
                                 ${rideDateTime ? `<span><i class="fa-regular fa-calendar mr-1"></i>${escapeHtml(rideDateTime)}</span>` : ''}
                                 <span class="rounded-md border border-slate-700 px-2 py-0.5 text-[10px] uppercase tracking-wide">${escapeHtml(rideStatus)}</span>
@@ -2005,7 +2008,7 @@
             if (!openAddModal()) return;
             document.getElementById('form-park-name').value = parkName;
             document.getElementById('form-park-ridden').value = '';
-            document.getElementById('form-coaster-ridden').value = rideName;
+            document.getElementById('form-coaster-ridden').value = '';
             document.getElementById('form-coaster-type').value = type;
             document.getElementById('form-variant-type').value = normalizeRideVariant(variant);
             document.getElementById('form-ride-status').value = status;
@@ -2036,32 +2039,14 @@
                     variant
                 });
             });
-            nameInput.readOnly = Boolean(ride || document.getElementById('form-coasterpedia-ride-id').value);
-            nameInput.classList.toggle('cursor-default', nameInput.readOnly);
-            nameInput.dataset.previousName = nameInput.value.trim();
+            nameInput.disabled = Boolean(ride || document.getElementById('form-coasterpedia-ride-id').value);
         }
 
         function selectOfficialCoasterName(name = '') {
             const nameInput = document.getElementById('form-coaster-name');
-            const riddenNameInput = document.getElementById('form-coaster-ridden');
-            const previousName = nameInput.dataset.previousName ?? nameInput.value.trim();
             const selectedName = name || nameInput.value;
             nameInput.value = selectedName;
-            if (!riddenNameInput.value.trim() || riddenNameInput.value.trim() === previousName) {
-                riddenNameInput.value = selectedName;
-            }
-            nameInput.dataset.previousName = selectedName;
             updateRideClassificationFromName();
-        }
-
-        function syncCoasterNameWhenRidden() {
-            const nameInput = document.getElementById('form-coaster-name');
-            const riddenNameInput = document.getElementById('form-coaster-ridden');
-            const previousName = nameInput.dataset.previousName ?? '';
-            if (!riddenNameInput.value.trim() || riddenNameInput.value.trim() === previousName) {
-                riddenNameInput.value = nameInput.value.trim();
-            }
-            nameInput.dataset.previousName = nameInput.value.trim();
         }
 
         function updateRideClassificationFromName() {
@@ -2090,9 +2075,7 @@
             document.getElementById('form-park-name').value = '';
             document.getElementById('form-park-ridden').value = '';
             document.getElementById('form-coaster-name').value = '';
-            document.getElementById('form-coaster-name').readOnly = false;
-            document.getElementById('form-coaster-name').classList.remove('cursor-default');
-            document.getElementById('form-coaster-name').dataset.previousName = '';
+            document.getElementById('form-coaster-name').disabled = false;
             document.getElementById('form-coaster-ridden').value = '';
             document.getElementById('form-coaster-type').value = 'Real';
             document.getElementById('form-variant-type').value = 'Original';
@@ -2128,7 +2111,9 @@
             document.getElementById('form-park-name').value = entry.parkName || '';
             document.getElementById('form-park-ridden').value = entry.parkNameRidden || entry.parkName || '';
             document.getElementById('form-coaster-name').value = entry.coasterName || '';
-            document.getElementById('form-coaster-ridden').value = entry.coasterNameRidden || entry.coasterName || '';
+            document.getElementById('form-coaster-ridden').value = entry.coasterNameRidden !== entry.coasterName
+                ? entry.coasterNameRidden || ''
+                : '';
             document.getElementById('form-coaster-type').value = entry.type || 'Real';
             document.getElementById('form-variant-type').value = rideEntryVariant(entry);
             document.getElementById('form-date-ridden').value = entry.dateRidden || '';
@@ -2176,7 +2161,6 @@
                     rideDetails.variant
                 );
                 selectOfficialCoasterName(rideDetails.name);
-                document.getElementById('form-coaster-ridden').value = rideDetails.name;
                 document.getElementById('form-ride-status').value = rideDetails.status;
                 document.getElementById('form-coaster-type').value = rideDetails.type;
                 document.getElementById('form-variant-type').value = normalizeRideVariant(rideDetails.variant);
@@ -2292,10 +2276,6 @@
             const coasterpediaClosingDate = document.getElementById('form-coasterpedia-closing-date').value;
             const savedAt = new Date();
 
-            if (!id && !relogSourceEntryId && !coasterNameRidden) {
-                coasterNameRidden = coasterName;
-            }
-
             if (relogSourceEntryId) {
                 const sourceGroup = getCoasterLogGroups().find(group =>
                     group.entries.some(entry => entry.id === relogSourceEntryId)
@@ -2304,10 +2284,6 @@
                     relogSourceEntryId = '';
                     showToast('The original log entry could not be found. Please try relogging again.', 'error');
                     return;
-                }
-                const previousRiddenName = sourceGroup.entry.coasterNameRidden || sourceGroup.entry.coasterName;
-                if (coasterName !== sourceGroup.entry.coasterName && coasterNameRidden === previousRiddenName) {
-                    coasterNameRidden = coasterName;
                 }
                 const reloggedEntry = {
                     ...sourceGroup.entry,

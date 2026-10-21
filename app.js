@@ -423,43 +423,9 @@
         }
 
         function duplicateRideGroupKeys(groups) {
-            const duplicateKeys = new Set();
-            const groupsByName = new Map();
-            groups.forEach(group => {
-                const name = (group.entry.coasterName || group.entry.coasterNameRidden || '').trim().toLocaleLowerCase();
-                if (!name) {
-                    if (rideEntryVariant(group.entry) === 'Relocated') duplicateKeys.add(group.key);
-                    return;
-                }
-                if (!groupsByName.has(name)) groupsByName.set(name, []);
-                groupsByName.get(name).push(group);
-            });
-            groupsByName.forEach(nameGroups => {
-                const relocatedGroups = nameGroups.filter(group => rideEntryVariant(group.entry) === 'Relocated');
-                relocatedGroups.forEach(group => duplicateKeys.add(group.key));
-                const distinctParks = new Set(nameGroups
-                    .map(group => (group.entry.parkName || group.entry.parkNameRidden || '').trim().toLocaleLowerCase())
-                    .filter(Boolean));
-                const rideIdsByPark = new Map();
-                nameGroups.forEach(group => {
-                    const rideId = group.entry.coasterpediaRideId;
-                    const parkKey = (group.entry.parkName || group.entry.parkNameRidden || '').trim().toLocaleLowerCase();
-                    if (!rideId || !parkKey) return;
-                    if (!rideIdsByPark.has(parkKey)) rideIdsByPark.set(parkKey, new Set());
-                    rideIdsByPark.get(parkKey).add(rideId);
-                });
-                const sameParkDistinctRides = [...rideIdsByPark.values()]
-                    .reduce((count, rideIds) => count + Math.max(0, rideIds.size - 1), 0);
-                const duplicateCount = Math.max(relocatedGroups.length, distinctParks.size - 1) + sameParkDistinctRides;
-                let selectedCount = relocatedGroups.length;
-                for (const group of nameGroups) {
-                    if (selectedCount >= duplicateCount) break;
-                    if (duplicateKeys.has(group.key)) continue;
-                    duplicateKeys.add(group.key);
-                    selectedCount++;
-                }
-            });
-            return duplicateKeys;
+            return new Set(groups
+                .filter(group => group.entries.some(entry => entry.isDuplicate === true))
+                .map(group => group.key));
         }
 
         // Stats & Calculation Rules Logic
@@ -705,6 +671,7 @@
             let html = '';
             filtered.forEach(group => {
                 const entry = group.entry;
+                const isDuplicate = duplicateKeys.has(group.key);
                 const openingEntry = group.entries.find(item => item.coasterpediaOpeningDate || item.coasterpediaClosingDate);
                 const operatingDates = [openingEntry?.coasterpediaOpeningDate, openingEntry?.coasterpediaClosingDate]
                     .map(formatCoasterpediaYear)
@@ -724,17 +691,24 @@
                         <div class="space-y-1.5 flex-grow">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <h4 class="text-base font-bold text-white">${escapeHtml(entry.coasterName)}</h4>
+                                <button type="button" onclick="toggleDuplicateEntry('${entry.id}')" aria-pressed="${isDuplicate}" title="${isDuplicate ? 'Remove duplicate mark' : 'Mark as duplicate'}" class="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-semibold transition ${isDuplicate ? 'border-violet-500/30 bg-violet-500/10 text-violet-300' : 'border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200'}">
+                                    <i class="fa-solid fa-copy"></i><span>${isDuplicate ? 'Duplicate' : 'Mark duplicate'}</span>
+                                </button>
                             </div>
                             ${entry.coasterNameRidden && entry.coasterNameRidden !== entry.coasterName
                                 ? `<p class="text-[11px] text-slate-400">Ridden as: ${escapeHtml(entry.coasterNameRidden)}</p>`
                                 : ''}
-                            <div class="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
-                                ${rideDateTime ? `<span><i class="fa-regular fa-calendar mr-1"></i>${escapeHtml(rideDateTime)}</span>` : ''}
-                                <span class="rounded-md border border-slate-700 px-2 py-0.5 text-[10px] uppercase tracking-wide">${escapeHtml(rideStatus)}</span>
-                                ${operatingDates ? `<span class="text-slate-500">Dates ${escapeHtml(operatingDates)}</span>` : ''}
-                                <span class="font-medium text-slate-200"><i class="fa-solid fa-location-dot text-brand-500 mr-1"></i>${escapeHtml(parkDisplayName)}</span>
-                                ${historicParkName ? `<span class="text-slate-500">${escapeHtml(historicParkName)}</span>` : ''}
-                                ${group.rideCount > 1 ? `<span><i class="fa-solid fa-ticket mr-1"></i>${group.rideCount} laps</span>` : ''}
+                            <div class="flex flex-col gap-2 text-xs text-slate-400 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+                                <div class="flex flex-wrap items-center gap-3">
+                                    ${rideDateTime ? `<span><i class="fa-regular fa-calendar mr-1"></i>${escapeHtml(rideDateTime)}</span>` : ''}
+                                    <span class="rounded-md border border-slate-700 px-2 py-0.5 text-[10px] uppercase tracking-wide">${escapeHtml(rideStatus)}</span>
+                                    ${operatingDates ? `<span class="text-slate-500">Dates ${escapeHtml(operatingDates)}</span>` : ''}
+                                    ${group.rideCount > 1 ? `<span><i class="fa-solid fa-ticket mr-1"></i>${group.rideCount} laps</span>` : ''}
+                                </div>
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <span class="font-medium text-slate-200"><i class="fa-solid fa-location-dot text-brand-500 mr-1"></i>${escapeHtml(parkDisplayName)}</span>
+                                    ${historicParkName ? `<span class="text-slate-500">Park when ridden: ${escapeHtml(historicParkName)}</span>` : ''}
+                                </div>
                             </div>
                             ${entry.notes ? `<p class="text-[11px] italic text-slate-500">${escapeHtml(entry.notes)}</p>` : ''}
                         </div>
@@ -2533,6 +2507,7 @@
                     rideStatus,
                     rideCount: sourceGroup.rideCount + 1,
                     notes,
+                    isDuplicate: sourceGroup.entries.some(entry => entry.isDuplicate === true),
                     loggedAt: savedAt.toISOString()
                 };
                 const isSameRide = rideIdentityKey(reloggedEntry) === sourceGroup.key;
@@ -2546,6 +2521,7 @@
                 } else {
                     reloggedEntry.id = 'entry_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
                     reloggedEntry.rideCount = 1;
+                    reloggedEntry.isDuplicate = false;
                     coasterLog.unshift(reloggedEntry);
                     showToast('New ride version added to your log', 'success');
                 }
@@ -2583,7 +2559,8 @@
                         unknownTime,
                         rideStatus,
                         rideCount,
-                        notes
+                        notes,
+                        isDuplicate: group?.entries.some(entry => entry.isDuplicate === true) || false
                     };
                     if (group?.entries.length > 1) {
                         const otherIds = new Set(group.entries.filter(entry => entry.id !== id).map(entry => entry.id));
@@ -2612,6 +2589,7 @@
                     unknownTime,
                     rideStatus,
                     loggedAt: new Date().toISOString(),
+                    isDuplicate: false,
                     rideCount,
                     notes
                 };
@@ -2629,6 +2607,21 @@
             if (!document.getElementById('tab-search').classList.contains('hidden')) {
                 renderRidesList();
             }
+        }
+
+        function toggleDuplicateEntry(id) {
+            if (!requireSignedIn()) return;
+            const group = getCoasterLogGroups().find(item => item.entries.some(entry => entry.id === id));
+            if (!group) return;
+
+            const markAsDuplicate = !group.entries.some(entry => entry.isDuplicate === true);
+            group.entries.forEach(entry => {
+                entry.isDuplicate = markAsDuplicate;
+            });
+            saveToLocalStorage();
+            updateStatsAndCounters();
+            renderLogbook();
+            showToast(markAsDuplicate ? 'Marked as duplicate' : 'Duplicate mark removed', 'success');
         }
 
         function deleteEntry(id) {

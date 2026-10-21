@@ -691,9 +691,7 @@
                         <div class="space-y-1.5 flex-grow">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <h4 class="text-base font-bold text-white">${escapeHtml(entry.coasterName)}</h4>
-                                <button type="button" onclick="toggleDuplicateEntry('${entry.id}')" aria-pressed="${isDuplicate}" title="${isDuplicate ? 'Remove duplicate mark' : 'Mark as duplicate'}" class="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-semibold transition ${isDuplicate ? 'border-violet-500/30 bg-violet-500/10 text-violet-300' : 'border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200'}">
-                                    <i class="fa-solid fa-copy"></i><span>${isDuplicate ? 'Duplicate' : 'Mark duplicate'}</span>
-                                </button>
+                                ${isDuplicate ? '<span class="rounded-md border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold text-violet-300">Duplicate</span>' : ''}
                             </div>
                             ${entry.coasterNameRidden && entry.coasterNameRidden !== entry.coasterName
                                 ? `<p class="text-[11px] text-slate-400">Ridden as: ${escapeHtml(entry.coasterNameRidden)}</p>`
@@ -713,7 +711,7 @@
                             ${entry.notes ? `<p class="text-[11px] italic text-slate-500">${escapeHtml(entry.notes)}</p>` : ''}
                         </div>
 
-                        <div class="flex items-center gap-2 self-end md:self-center">
+                        <div class="flex flex-wrap items-center justify-end gap-2 self-end md:self-center">
                             <button onclick="openEditModal('${entry.id}')" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-bordercolor text-xs transition flex items-center gap-1.5" title="Edit Entry" aria-label="Edit ${escapeHtml(entry.coasterName)}">
                                 <i class="fa-solid fa-pen"></i><span>Edit</span>
                             </button>
@@ -2253,6 +2251,7 @@
             relogSourceEntryId = '';
             relogInitialCoasterName = '';
             relogVersionManuallySelected = false;
+            document.getElementById('form-duplicate-row').classList.add('hidden');
             setRideNameVersionOptions();
             document.getElementById('modal-entry-title').innerHTML = `<i class="fa-solid fa-pen-to-square text-brand-500"></i> Add Log Entry`;
             document.getElementById('form-entry-submit').textContent = 'Save Ride Entry';
@@ -2278,6 +2277,7 @@
             toggleUnknownRideDate('time');
             document.getElementById('form-ride-status').value = 'Unknown';
             document.getElementById('form-ride-count').value = 1;
+            document.getElementById('form-is-duplicate').checked = false;
             document.getElementById('form-notes').value = '';
             document.getElementById('modal-entry').classList.remove('hidden');
             return true;
@@ -2288,6 +2288,7 @@
             relogSourceEntryId = '';
             relogInitialCoasterName = '';
             relogVersionManuallySelected = false;
+            document.getElementById('form-duplicate-row').classList.remove('hidden');
             const group = getCoasterLogGroups().find(item => item.entries.some(entry => entry.id === id));
             const entry = group?.entry;
             if (!entry) return false;
@@ -2316,6 +2317,8 @@
             toggleUnknownRideDate('time');
             document.getElementById('form-ride-status').value = normalizeCoasterStatus(entry.rideStatus || 'Unknown');
             document.getElementById('form-ride-count').value = group.rideCount;
+            document.getElementById('form-is-duplicate').checked =
+                group.entries.some(item => item.isDuplicate === true);
             document.getElementById('form-notes').value = entry.notes || '';
             const matchingRide = currentParkRides.find(ride =>
                 (ride.sourceRideId || ride.id) === entry.coasterpediaRideId
@@ -2470,6 +2473,7 @@
             const unknownTime = document.getElementById('form-time-unknown').checked;
             const rideStatus = normalizeCoasterStatus(document.getElementById('form-ride-status').value);
             const rideCount = parseInt(document.getElementById('form-ride-count').value) || 1;
+            const isDuplicate = document.getElementById('form-is-duplicate').checked;
             const notes = document.getElementById('form-notes').value.trim();
             const coasterpediaRideId = document.getElementById('form-coasterpedia-ride-id').value;
             const coasterpediaPageId = document.getElementById('form-coasterpedia-page-id').value;
@@ -2507,7 +2511,7 @@
                     rideStatus,
                     rideCount: sourceGroup.rideCount + 1,
                     notes,
-                    isDuplicate: sourceGroup.entries.some(entry => entry.isDuplicate === true),
+                    isDuplicate,
                     loggedAt: savedAt.toISOString()
                 };
                 const isSameRide = rideIdentityKey(reloggedEntry) === sourceGroup.key;
@@ -2521,7 +2525,6 @@
                 } else {
                     reloggedEntry.id = 'entry_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
                     reloggedEntry.rideCount = 1;
-                    reloggedEntry.isDuplicate = false;
                     coasterLog.unshift(reloggedEntry);
                     showToast('New ride version added to your log', 'success');
                 }
@@ -2560,7 +2563,7 @@
                         rideStatus,
                         rideCount,
                         notes,
-                        isDuplicate: group?.entries.some(entry => entry.isDuplicate === true) || false
+                        isDuplicate
                     };
                     if (group?.entries.length > 1) {
                         const otherIds = new Set(group.entries.filter(entry => entry.id !== id).map(entry => entry.id));
@@ -2589,7 +2592,7 @@
                     unknownTime,
                     rideStatus,
                     loggedAt: new Date().toISOString(),
-                    isDuplicate: false,
+                    isDuplicate,
                     rideCount,
                     notes
                 };
@@ -2607,21 +2610,6 @@
             if (!document.getElementById('tab-search').classList.contains('hidden')) {
                 renderRidesList();
             }
-        }
-
-        function toggleDuplicateEntry(id) {
-            if (!requireSignedIn()) return;
-            const group = getCoasterLogGroups().find(item => item.entries.some(entry => entry.id === id));
-            if (!group) return;
-
-            const markAsDuplicate = !group.entries.some(entry => entry.isDuplicate === true);
-            group.entries.forEach(entry => {
-                entry.isDuplicate = markAsDuplicate;
-            });
-            saveToLocalStorage();
-            updateStatsAndCounters();
-            renderLogbook();
-            showToast(markAsDuplicate ? 'Marked as duplicate' : 'Duplicate mark removed', 'success');
         }
 
         function deleteEntry(id) {

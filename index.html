@@ -359,7 +359,7 @@
                         <h2 class="text-lg font-bold text-white flex items-center gap-2">
                             <i class="fa-solid fa-globe text-brand-500"></i> Coasterpedia Coaster Discovery
                         </h2>
-                        <p class="text-xs text-slate-400">Browse or search all Coasterpedia parks that list present or former coasters</p>
+                        <p class="text-xs text-slate-400">Browse parks by operating, not operating, and defunct coasters</p>
                     </div>
                 </div>
 
@@ -380,7 +380,7 @@
                 <div id="rides-results-placeholder" class="text-center py-12">
                     <i class="fa-solid fa-location-dot text-4xl text-slate-600 mb-3 block"></i>
                     <h4 class="text-sm font-semibold text-slate-300">No Park Selected</h4>
-                    <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1">Search for a park above to browse present and former coasters.</p>
+                    <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1">Search for a park above to browse operating, not operating, and defunct coasters.</p>
                 </div>
 
                 <div id="rides-loading" class="hidden text-center py-12">
@@ -392,7 +392,7 @@
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-bordercolor pb-4">
                         <div>
                             <h3 id="current-park-title" class="text-base font-bold text-white">Park Attractions</h3>
-                            <p id="current-park-sub" class="text-xs text-slate-400">Browse present and former coasters, including earlier names of reimagined rides</p>
+                            <p id="current-park-sub" class="text-xs text-slate-400">Operating, not operating, and defunct coasters listed for this park</p>
                         </div>
                         <input type="text" id="ride-search-filter" oninput="filterRidesList()" placeholder="Filter rides in this park..." class="bg-slate-900 border border-bordercolor rounded-xl px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500 w-full sm:w-64">
                     </div>
@@ -579,6 +579,6 @@
     </div>
 
     <script type="module" src="firebase-cloud.js"></script>
-    <script src="app.js?v=directory-names-only-20261021" defer></script>
+    <script src="app.js?v=cloud-log-and-ride-status-groups-20261021-3" defer></script>
 </body>
 </html>

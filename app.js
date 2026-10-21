@@ -626,7 +626,7 @@
                         ${park.entries.slice().sort((a, b) => (a.entry.coasterName || '').localeCompare(b.entry.coasterName || '')).map(group => `
                             <button type="button" data-park="${escapeHtml(park.name)}" data-coaster="${escapeHtml(group.entry.coasterName || '')}" data-ride-id="${escapeHtml(group.entry.coasterpediaRideId || '')}" onclick="applyDashboardFilter('ride', {park: this.dataset.park, coaster: this.dataset.coaster, rideId: this.dataset.rideId})" class="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-xs hover:bg-slate-800">
                                 <span class="text-slate-200">${escapeHtml(group.entry.coasterName || 'Unnamed coaster')}${group.rideCount > 1 ? ` · ${group.rideCount} laps` : ''}</span>
-                                <span class="text-slate-500">${escapeHtml(group.entry.rideStatus || 'Status unknown')}</span>
+                                <span class="text-slate-500">${escapeHtml(normalizeCoasterStatus(group.entry.rideStatus || 'Status unknown'))}</span>
                             </button>
                         `).join('')}
                     </div>
@@ -715,7 +715,7 @@
                     : entry.parkName || 'Standalone ride';
 
                 const rideDateTime = formatRideDateTime(entry);
-                const rideStatus = entry.rideStatus || 'Status unknown';
+                const rideStatus = normalizeCoasterStatus(entry.rideStatus || 'Status unknown');
 
                 html += `
                     <div class="bg-cardbg rounded-2xl border border-bordercolor p-4 hover:border-slate-700 transition flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -734,13 +734,13 @@
                         </div>
 
                         <div class="flex items-center gap-2 self-end md:self-center">
-                            <button onclick="openEditModal('${entry.id}')" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-bordercolor text-xs transition flex items-center gap-1.5" title="Edit Entry" aria-label="Edit ${escapeHtml(coasterDisplayName)}">
+                            <button onclick="openEditModal('${entry.id}')" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-bordercolor text-xs transition flex items-center gap-1.5" title="Edit Entry" aria-label="Edit ${escapeHtml(entry.coasterName)}">
                                 <i class="fa-solid fa-pen"></i><span>Edit</span>
                             </button>
                             <button type="button" onclick="relogEntry('${entry.id}')" class="px-3 py-2 rounded-xl bg-brand-600/10 hover:bg-brand-600/20 text-brand-300 border border-brand-500/20 text-xs transition flex items-center gap-1.5" title="Edit and save a relog">
                                 <i class="fa-solid fa-rotate"></i><span>Relog</span>
                             </button>
-                            <button type="button" onclick="deleteEntry('${entry.id}')" class="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs transition" title="Delete Entry" aria-label="Delete ${escapeHtml(coasterDisplayName)} log entry">
+                            <button type="button" onclick="deleteEntry('${entry.id}')" class="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs transition" title="Delete Entry" aria-label="Delete ${escapeHtml(entry.coasterName)} log entry">
                                 <i class="fa-solid fa-trash"></i>
                             </button>
                         </div>
@@ -917,7 +917,7 @@
             if (coasterpediaSearchResults.length < minimumResults && parkSearchCursor < parkSearchCandidates.length) {
                 await loadMoreCoasterpediaParks(requestId);
             } else if (coasterpediaSearchResults.length === 0) {
-                renderParkSearchMessage('No parks with present or former coaster lists found.');
+                renderParkSearchMessage('No parks with operating, not operating, or defunct coaster lists found.');
             }
         }
 
@@ -932,9 +932,26 @@
         }
 
         function coasterpediaCoasterEra(heading) {
-            if (/^(?:present|current|operating|standing but not operating|under construction|under refurbishment|in storage|temporarily closed)$/i.test(heading)) return 'Present';
-            if (/^(?:past|former|defunct)$/i.test(heading)) return 'Former';
+            if (/^(?:not operating|standing but not operating|under construction|under refurbishment|in storage|temporarily closed|never operated)$/i.test(heading)) return 'Not operating';
+            if (/^(?:present|current|operating)$/i.test(heading)) return 'Operating';
+            if (/^(?:past|former|defunct)$/i.test(heading)) return 'Defunct';
             return null;
+        }
+
+        function normalizeCoasterStatus(status = 'Unknown') {
+            const value = String(status || 'Unknown').trim();
+            if (/^(?:present|current|operating)$/i.test(value)) return 'Operating';
+            if (/^(?:former|past|defunct)$/i.test(value)) return 'Defunct';
+            if (/^(?:not operating|standing but not operating|under construction|under refurbishment|in storage|temporarily closed|never operated)$/i.test(value)) return 'Not operating';
+            return value;
+        }
+
+        function coasterStatusForRide(ride) {
+            return normalizeCoasterStatus(String(ride.entityType || '').replace(/\s+coaster$/i, ''));
+        }
+
+        function isNotOperatingCoasterRow(value = '') {
+            return /\b(?:not operating|under construction|under refurbishment|in storage|temporarily closed)\b/i.test(value);
         }
 
         function coasterpediaCoasterListHeadingEra(heading) {
@@ -1033,7 +1050,7 @@
             const tocData = await tocResponse.json();
             const sections = findCoasterpediaSections(tocData.parse?.tocdata?.sections || []);
             if (sections.length === 0) {
-                throw new Error(`"${parkTitle}" does not have a present or former coaster list.`);
+                throw new Error(`"${parkTitle}" does not have a coaster list.`);
             }
 
             const rides = (await Promise.all(sections.map(async section => {
@@ -1069,7 +1086,7 @@
         function updateLoggedRideStatuses(parkTitle, rides) {
             const ridesByName = new Map();
             rides.forEach(ride => {
-                const status = ride.entityType.startsWith('Former') ? 'Former' : 'Present';
+                const status = coasterStatusForRide(ride);
                 ridesByName.set(normalizeRideStatusName(ride.name), status);
             });
 
@@ -1149,14 +1166,19 @@
                 while (headingStack.length && headingStack.at(-1).level >= level) headingStack.pop();
 
                 const directEra = coasterpediaCoasterListHeadingEra(heading);
+                const ancestorHeadings = headingStack.slice().reverse().map(item => item.title);
+                const neverOperatedSection = /\bnever operated\b/i.test(heading) ||
+                    ancestorHeadings.some(title => /\bnever operated\b/i.test(title));
                 if (directEra || /^(?:roller\s+)?coasters?$/i.test(heading)) {
-                    const ancestorEra = headingStack.slice().reverse()
-                        .map(item => coasterpediaCoasterEra(item.title))
+                    const ancestorEra = ancestorHeadings
+                        .map(title => coasterpediaCoasterEra(title))
                         .find(Boolean);
-                    coasterSections.push({
-                        index: section.index,
-                        status: directEra || ancestorEra || 'Present'
-                    });
+                    if (!neverOperatedSection) {
+                        coasterSections.push({
+                            index: section.index,
+                            status: directEra || ancestorEra || 'Operating'
+                        });
+                    }
                 }
 
                 headingStack.push({ level, title: heading });
@@ -1182,7 +1204,8 @@
                 const classColumn = headers.findIndex(header => /^(?:class|category|ride type)$/.test(header));
 
                 rows.forEach(row => {
-                    if (row === headerRow || /never operated/i.test(row.textContent)) return;
+                    if (row === headerRow || /\bnever operated\b/i.test(row.textContent)) return;
+                    const rowStatus = isNotOperatingCoasterRow(row.textContent) ? 'Not operating' : status;
                     const cells = [...row.children].filter(cell => cell.tagName === 'TH' || cell.tagName === 'TD');
                     if (!cells.length) return;
                     const nameCell = cells[nameColumn >= 0 ? nameColumn : 0];
@@ -1204,7 +1227,7 @@
                         sourceRideId: decodedTitle,
                         name,
                         pageTitle: decodedTitle,
-                        entityType: `${status} coaster`,
+                        entityType: `${rowStatus} coaster`,
                         parkName,
                         type: classifyCoasterpediaRide(rideClass),
                         rideType: cleanCoasterpediaCell(rideClass) || classifyRideLabel(''),
@@ -1224,11 +1247,7 @@
                 const table = tableMatch[1];
                 const subsections = [...wikitext.slice(0, tableMatch.index).matchAll(/^={3}\s*(.*?)\s*={3}\s*$/gm)];
                 const subsectionTitle = subsections.at(-1)?.[1]?.trim() || '';
-                const rideStatus = /^(defunct|former|past)$/i.test(subsectionTitle)
-                    ? 'Former'
-                    : /^(operating|present|current)$/i.test(subsectionTitle)
-                        ? 'Present'
-                        : status;
+                const rideStatus = coasterpediaCoasterEra(subsectionTitle) || status;
                 const headers = table.split(/\r?\n/)
                     .filter(line => line.trim().startsWith('!'))
                     .flatMap(line => line.trim().slice(1).split('!!'))
@@ -1237,7 +1256,8 @@
                 const classColumn = headers.findIndex(header => /^(class|category|ride type)$/.test(header));
 
                 table.split(/^\|-/m).slice(1).forEach(row => {
-                    if (/\{\{\s*never operated\s*\}\}/i.test(row)) return;
+                    if (/\bnever operated\b/i.test(row)) return;
+                    const rowStatus = isNotOperatingCoasterRow(row) ? 'Not operating' : rideStatus;
                     const cells = [];
                     row.split(/\r?\n/).map(line => line.trim())
                         .filter(line => line.startsWith('|') && !line.startsWith('|}') && !line.startsWith('|+'))
@@ -1272,7 +1292,7 @@
                         sourceRideId: pageTitle,
                         name,
                         pageTitle,
-                        entityType: `${rideStatus} coaster`,
+                        entityType: `${rowStatus} coaster`,
                         parkName,
                         type: classifyCoasterpediaRide(rideClass),
                         rideType,
@@ -1612,9 +1632,10 @@
                     return rides[0];
                 }
 
-                const canonicalRide = rides.find(ride => ride.entityType === 'Present coaster') || rides[0];
-                if (rides.some(ride => ride.entityType === 'Present coaster')) {
-                    canonicalRide.entityType = 'Present coaster';
+                const canonicalRide = rides.find(ride => ride.entityType === 'Operating coaster') ||
+                    rides.find(ride => ride.entityType === 'Not operating coaster') || rides[0];
+                if (rides.some(ride => ride.entityType === 'Operating coaster')) {
+                    canonicalRide.entityType = 'Operating coaster';
                 }
                 canonicalRide.hasRelocatedHistory = rides.some(ride => ride.hasRelocatedHistory || ride.variant === 'Relocated');
                 canonicalRide.variant = rides.some(ride => ride.variant === 'ElementChange')
@@ -1856,8 +1877,9 @@
 
             let html = '';
             const sections = [
-                { title: 'Present Coasters', rides: filtered.filter(ride => ride.entityType === 'Present coaster') },
-                { title: 'Former Coasters', rides: filtered.filter(ride => ride.entityType.startsWith('Former')) }
+                { title: 'Operating', rides: filtered.filter(ride => ride.entityType === 'Operating coaster') },
+                { title: 'Not operating', rides: filtered.filter(ride => ride.entityType === 'Not operating coaster') },
+                { title: 'Defunct', rides: filtered.filter(ride => ride.entityType === 'Defunct coaster') }
             ];
 
             sections.forEach(section => {
@@ -1903,6 +1925,7 @@
                     const articleUrl = `https://coasterpedia.net/wiki/${encodeURIComponent(ride.pageTitle.replace(/ /g, '_'))}`;
                     const rideType = ride.rideType || classifyRideLabel(ride.type || '');
                     const variant = displayedVariant;
+                    const rideStatus = coasterStatusForRide(ride);
                     const disambiguatingOpeningDate = sameNameRideCount > 1 ? formatCoasterpediaYear(ride.openingDate) : '';
                     const disambiguatingClosingDate = sameNameRideCount > 1 ? formatCoasterpediaYear(ride.closingDate) : '';
                     const disambiguatingDateLabel = [disambiguatingOpeningDate, disambiguatingClosingDate].filter(Boolean).join('–');
@@ -1911,8 +1934,8 @@
                         : '';
                     const reimaginedAction = ride.hasReimaginedVersion
                         ? (reimaginedEntry
-                            ? `<button data-entry-id="${escapeHtml(reimaginedEntry.id)}" data-current-name="${escapeHtml(ride.name)}" data-status="${ride.entityType.startsWith('Former') ? 'Former' : 'Present'}" data-ride-type="${ride.type || 'Real'}" data-ride-id="${escapeHtml(rideSourceId)}" onclick="relogEntry(this.dataset.entryId, {name: this.dataset.currentName, status: this.dataset.status, type: this.dataset.rideType, variant: 'ElementChange', rideId: this.dataset.rideId})" class="rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-[11px] font-semibold text-violet-300 transition hover:bg-violet-500/20"><i class="fa-solid fa-rotate mr-1"></i>Relog Reimagined</button>`
-                            : `<button data-park-name="${escapeHtml(ride.parkName)}" data-ride-name="${escapeHtml(ride.name)}" data-ride-type="${ride.type || 'Real'}" data-status="${ride.entityType.startsWith('Former') ? 'Former' : 'Present'}" data-ride-id="${escapeHtml(rideSourceId)}" onclick="quickLogRide(this.dataset.parkName, this.dataset.rideName, 'ElementChange', this.dataset.rideType, this.dataset.status, this.dataset.rideId)" class="rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-[11px] font-semibold text-violet-300 transition hover:bg-violet-500/20"><i class="fa-solid fa-plus mr-1"></i>Log Reimagined</button>`)
+                            ? `<button data-entry-id="${escapeHtml(reimaginedEntry.id)}" data-current-name="${escapeHtml(ride.name)}" data-status="${rideStatus}" data-ride-type="${ride.type || 'Real'}" data-ride-id="${escapeHtml(rideSourceId)}" onclick="relogEntry(this.dataset.entryId, {name: this.dataset.currentName, status: this.dataset.status, type: this.dataset.rideType, variant: 'ElementChange', rideId: this.dataset.rideId})" class="rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-[11px] font-semibold text-violet-300 transition hover:bg-violet-500/20"><i class="fa-solid fa-rotate mr-1"></i>Relog Reimagined</button>`
+                            : `<button data-park-name="${escapeHtml(ride.parkName)}" data-ride-name="${escapeHtml(ride.name)}" data-ride-type="${ride.type || 'Real'}" data-status="${rideStatus}" data-ride-id="${escapeHtml(rideSourceId)}" onclick="quickLogRide(this.dataset.parkName, this.dataset.rideName, 'ElementChange', this.dataset.rideType, this.dataset.status, this.dataset.rideId)" class="rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-[11px] font-semibold text-violet-300 transition hover:bg-violet-500/20"><i class="fa-solid fa-plus mr-1"></i>Log Reimagined</button>`)
                         : '';
 
                     html += `
@@ -1933,13 +1956,13 @@
                             </div>
                             ${loggedEntry
                                 ? `<div class="flex gap-2 self-end sm:self-auto">
-                                    <button data-entry-id="${escapeHtml(loggedEntry.id)}" data-current-name="${escapeHtml(displayedRideName)}" data-status="${ride.entityType.startsWith('Former') ? 'Former' : 'Present'}" data-ride-type="${ride.type || 'Real'}" data-variant="${variant}" data-ride-id="${escapeHtml(rideSourceId)}" data-opening-date="${escapeHtml(disambiguatingOpeningDate)}" data-closing-date="${escapeHtml(disambiguatingClosingDate)}" onclick="relogEntry(this.dataset.entryId, {name: this.dataset.currentName, status: this.dataset.status, type: this.dataset.rideType, variant: this.dataset.variant, rideId: this.dataset.rideId, openingDate: this.dataset.openingDate, closingDate: this.dataset.closingDate})" class="rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-1.5 text-[11px] font-semibold text-brand-300 transition hover:bg-brand-500/20"><i class="fa-solid fa-rotate mr-1"></i>Relog</button>
+                                    <button data-entry-id="${escapeHtml(loggedEntry.id)}" data-current-name="${escapeHtml(displayedRideName)}" data-status="${rideStatus}" data-ride-type="${ride.type || 'Real'}" data-variant="${variant}" data-ride-id="${escapeHtml(rideSourceId)}" data-opening-date="${escapeHtml(disambiguatingOpeningDate)}" data-closing-date="${escapeHtml(disambiguatingClosingDate)}" onclick="relogEntry(this.dataset.entryId, {name: this.dataset.currentName, status: this.dataset.status, type: this.dataset.rideType, variant: this.dataset.variant, rideId: this.dataset.rideId, openingDate: this.dataset.openingDate, closingDate: this.dataset.closingDate})" class="rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-1.5 text-[11px] font-semibold text-brand-300 transition hover:bg-brand-500/20"><i class="fa-solid fa-rotate mr-1"></i>Relog</button>
                                     <button data-entry-id="${escapeHtml(loggedEntry.id)}" data-current-name="${escapeHtml(displayedRideName)}" onclick="openRideEntryEdit(this.dataset.entryId, this.dataset.currentName)" class="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[11px] font-semibold text-rose-300 transition hover:bg-rose-500/20"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
                                     <button data-entry-id="${escapeHtml(loggedEntry.id)}" onclick="deleteEntry(this.dataset.entryId)" class="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300 transition hover:bg-rose-500/20" title="Delete log entry" aria-label="Delete ${escapeHtml(displayedRideName)} log entry"><i class="fa-solid fa-trash"></i></button>
                                     ${reimaginedAction}
                                 </div>`
                                 : `<div class="flex flex-wrap gap-2 self-end sm:self-auto">
-                                    <button data-park-name="${escapeHtml(ride.parkName)}" data-ride-name="${escapeHtml(displayedRideName)}" data-ride-type="${ride.type || 'Real'}" data-variant="${variant}" data-status="${ride.entityType.startsWith('Former') ? 'Former' : 'Present'}" data-ride-id="${escapeHtml(rideSourceId)}" data-opening-date="${escapeHtml(disambiguatingOpeningDate)}" data-closing-date="${escapeHtml(disambiguatingClosingDate)}" onclick="quickLogRide(this.dataset.parkName, this.dataset.rideName, this.dataset.variant, this.dataset.rideType, this.dataset.status, this.dataset.rideId, this.dataset.openingDate, this.dataset.closingDate)" class="rounded-lg bg-brand-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-brand-500"><i class="fa-solid fa-plus mr-1"></i>Log Coaster</button>
+                                    <button data-park-name="${escapeHtml(ride.parkName)}" data-ride-name="${escapeHtml(displayedRideName)}" data-ride-type="${ride.type || 'Real'}" data-variant="${variant}" data-status="${rideStatus}" data-ride-id="${escapeHtml(rideSourceId)}" data-opening-date="${escapeHtml(disambiguatingOpeningDate)}" data-closing-date="${escapeHtml(disambiguatingClosingDate)}" onclick="quickLogRide(this.dataset.parkName, this.dataset.rideName, this.dataset.variant, this.dataset.rideType, this.dataset.status, this.dataset.rideId, this.dataset.openingDate, this.dataset.closingDate)" class="rounded-lg bg-brand-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-brand-500"><i class="fa-solid fa-plus mr-1"></i>Log Coaster</button>
                                     ${reimaginedAction}
                                 </div>`}
                         </div>
@@ -2102,7 +2125,7 @@
             document.getElementById('form-time-unknown').checked = entry.unknownTime === true;
             toggleUnknownRideDate('date');
             toggleUnknownRideDate('time');
-            document.getElementById('form-ride-status').value = entry.rideStatus || 'Unknown';
+            document.getElementById('form-ride-status').value = normalizeCoasterStatus(entry.rideStatus || 'Unknown');
             document.getElementById('form-ride-count').value = group.rideCount;
             document.getElementById('form-notes').value = entry.notes || '';
             const matchingRide = currentParkRides.find(ride =>
@@ -2249,7 +2272,7 @@
             const timeRidden = document.getElementById('form-time-ridden').value;
             const unknownDate = document.getElementById('form-date-unknown').checked;
             const unknownTime = document.getElementById('form-time-unknown').checked;
-            const rideStatus = document.getElementById('form-ride-status').value;
+            const rideStatus = normalizeCoasterStatus(document.getElementById('form-ride-status').value);
             const rideCount = parseInt(document.getElementById('form-ride-count').value) || 1;
             const notes = document.getElementById('form-notes').value.trim();
             const coasterpediaRideId = document.getElementById('form-coasterpedia-ride-id').value;

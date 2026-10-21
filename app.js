@@ -1155,36 +1155,52 @@
         }
 
         function findCoasterpediaSections(sections) {
-            const coasterSections = [];
+            const entries = sections.map(section => ({
+                ...section,
+                level: Number(section.hLevel),
+                heading: String(section.line || '').replace(/<[^>]*>/g, '').trim()
+                    .replace(/&amp;/gi, '&').replace(/&#0*39;|&apos;/gi, "'")
+                    .replace(/&quot;/gi, '"').replace(/&nbsp;/gi, ' '),
+                ancestors: []
+            }));
             const headingStack = [];
 
-            sections.forEach(section => {
-                const level = Number(section.hLevel);
-                const heading = String(section.line || '').replace(/<[^>]*>/g, '').trim()
-                    .replace(/&amp;/gi, '&').replace(/&#0*39;|&apos;/gi, "'")
-                    .replace(/&quot;/gi, '"').replace(/&nbsp;/gi, ' ');
-                while (headingStack.length && headingStack.at(-1).level >= level) headingStack.pop();
-
-                const directEra = coasterpediaCoasterListHeadingEra(heading);
-                const ancestorHeadings = headingStack.slice().reverse().map(item => item.title);
-                const neverOperatedSection = /\bnever operated\b/i.test(heading) ||
-                    ancestorHeadings.some(title => /\bnever operated\b/i.test(title));
-                if (directEra || /^(?:roller\s+)?coasters?$/i.test(heading)) {
-                    const ancestorEra = ancestorHeadings
-                        .map(title => coasterpediaCoasterEra(title))
-                        .find(Boolean);
-                    if (!neverOperatedSection) {
-                        coasterSections.push({
-                            index: section.index,
-                            status: directEra || ancestorEra || 'Operating'
-                        });
-                    }
-                }
-
-                headingStack.push({ level, title: heading });
+            entries.forEach(entry => {
+                while (headingStack.length && headingStack.at(-1).level >= entry.level) headingStack.pop();
+                entry.ancestors = [...headingStack];
+                headingStack.push(entry);
             });
 
-            return coasterSections;
+            const isPlainCoasterHeading = heading => /^(?:roller\s+)?coasters?$/i.test(heading);
+            const hasCoasterListAncestor = entry => entry.ancestors.some(ancestor =>
+                coasterpediaCoasterListHeadingEra(ancestor.heading) || isPlainCoasterHeading(ancestor.heading)
+            );
+            const nestedStatusSections = entries.filter(entry =>
+                coasterpediaCoasterEra(entry.heading) && hasCoasterListAncestor(entry)
+            );
+
+            return entries.flatMap(entry => {
+                const directEra = coasterpediaCoasterListHeadingEra(entry.heading);
+                const plainHeading = isPlainCoasterHeading(entry.heading);
+                const nestedEra = coasterpediaCoasterEra(entry.heading);
+                const isNestedStatus = nestedEra && hasCoasterListAncestor(entry);
+                if (!directEra && !plainHeading && !isNestedStatus) return [];
+
+                const neverOperatedSection = /\bnever operated\b/i.test(entry.heading) ||
+                    entry.ancestors.some(ancestor => /\bnever operated\b/i.test(ancestor.heading));
+                const hasNestedStatusLists = nestedStatusSections.some(statusSection =>
+                    statusSection.ancestors.some(ancestor => ancestor.index === entry.index)
+                );
+                if (neverOperatedSection || (plainHeading && hasNestedStatusLists)) return [];
+
+                const ancestorEra = entry.ancestors.slice().reverse()
+                    .map(ancestor => coasterpediaCoasterEra(ancestor.heading))
+                    .find(Boolean);
+                return [{
+                    index: entry.index,
+                    status: isNestedStatus ? nestedEra : directEra || ancestorEra || 'Operating'
+                }];
+            });
         }
 
         function parseCoasterpediaRenderedCoasters(html, parkName, status) {

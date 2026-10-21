@@ -705,7 +705,7 @@
                                 </div>
                                 <div class="flex flex-wrap items-center gap-3">
                                     <span class="font-medium text-slate-200"><i class="fa-solid fa-location-dot text-brand-500 mr-1"></i>${escapeHtml(parkDisplayName)}</span>
-                                    ${historicParkName ? `<span class="text-slate-500">Park when ridden: ${escapeHtml(historicParkName)}</span>` : ''}
+                                    ${historicParkName ? `<span class="text-slate-500">${escapeHtml(historicParkName)}</span>` : ''}
                                 </div>
                             </div>
                             ${entry.notes ? `<p class="text-[11px] italic text-slate-500">${escapeHtml(entry.notes)}</p>` : ''}

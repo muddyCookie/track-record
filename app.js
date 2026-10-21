@@ -206,11 +206,11 @@
 
         function updateAccountAction() {
             const signedIn = Boolean(window.trackRecordCloud?.getCurrentUser() || currentUser);
-            document.getElementById('account-action-label').innerText = signedIn ? 'Sign out' : 'Sign in';
+            document.getElementById('account-action-label').innerText = signedIn ? 'Sign Out' : 'Sign In';
             document.getElementById('account-action-icon').className = signedIn
                 ? 'fa-solid fa-arrow-right-from-bracket'
                 : 'fa-solid fa-arrow-right-to-bracket';
-            document.getElementById('account-action').title = signedIn ? 'Sign out' : 'Sign in';
+            document.getElementById('account-action').title = signedIn ? 'Sign Out' : 'Sign In';
         }
 
         function openAuthDialog(message = '') {
@@ -275,8 +275,8 @@
         function toggleAuthMode() {
             authMode = authMode === 'signin' ? 'signup' : 'signin';
             const signUp = authMode === 'signup';
-            document.getElementById('auth-submit').innerText = signUp ? 'Create account' : 'Sign in';
-            document.getElementById('auth-mode-toggle').innerText = signUp ? 'I already have an account' : 'Create an account';
+            document.getElementById('auth-submit').innerText = signUp ? 'Create Account' : 'Sign In';
+            document.getElementById('auth-mode-toggle').innerText = signUp ? 'I already have an account' : 'Create an Account';
             document.getElementById('auth-password').autocomplete = signUp ? 'new-password' : 'current-password';
             document.getElementById('auth-reset').classList.toggle('hidden', signUp);
             showAuthMessage('', 'status');
@@ -733,7 +733,7 @@
                                 <span class="rounded-md border border-slate-700 px-2 py-0.5 text-[10px] uppercase tracking-wide">${escapeHtml(rideStatus)}</span>
                                 ${operatingDates ? `<span class="text-slate-500">Dates ${escapeHtml(operatingDates)}</span>` : ''}
                                 <span class="font-medium text-slate-200"><i class="fa-solid fa-location-dot text-brand-500 mr-1"></i>${escapeHtml(parkDisplayName)}</span>
-                                ${historicParkName ? `<span class="text-slate-500">Park when ridden: ${escapeHtml(historicParkName)}</span>` : ''}
+                                ${historicParkName ? `<span class="text-slate-500">${escapeHtml(historicParkName)}</span>` : ''}
                                 ${group.rideCount > 1 ? `<span><i class="fa-solid fa-ticket mr-1"></i>${group.rideCount} laps</span>` : ''}
                             </div>
                             ${entry.notes ? `<p class="text-[11px] italic text-slate-500">${escapeHtml(entry.notes)}</p>` : ''}

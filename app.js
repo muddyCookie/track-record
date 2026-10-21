@@ -1323,7 +1323,7 @@
 
         function splitCoasterpediaFormerNames(value = '') {
             return String(value)
-                .split(/<br\s*\/?>|[,;]/i)
+                .split(/<br\s*\/?>|;/i)
                 .map(cleanCoasterpediaFormerName)
                 .filter(isLikelyCoasterFormerName);
         }
@@ -1337,6 +1337,7 @@
             if (/^(?:the|a|an)\s+(?:ride|coaster|roller coaster|attraction|train|track|layout|name|theme|area|park)$/i.test(value)) return false;
             if (/^(?:was|were|is|are|would|will|could|should|opened|closed|renamed|relocated)\b/i.test(value)) return false;
             if (/^(?:operating|closed|removed|relocated|unknown|present|current)$/i.test(value)) return false;
+            if (/\b(?:train|trains|car|cars|vehicle|vehicles|locomotive|lead car)\b/i.test(value)) return false;
             if (/\b(?:tallest|fastest|longest|highest|steepest|complete circuit|roller coaster|coaster to|first|second|third|record|records?|height|speed|drop|inversion|inversions|track length)\b/i.test(value)) return false;
             if (value.split(/\s+/).length > 5) return false;
             if (/^(?:18|19|20)\d{2}(?:\s*[^a-z0-9\s]\s*(?:(?:18|19|20)\d{2}|present|current))?$/i.test(value)) return false;
@@ -1357,7 +1358,7 @@
             const values = [...infobox.matchAll(/^\|\s*(?:past[\s_-]*names?|previous(?:ly)?[\s_-]*names?|former[\s_-]*names?|previously[\s_-]*known[\s_-]*as)\s*=\s*(.+)$/gim)]
                 .map(match => match[1]);
             return [...new Set(values.flatMap(value => {
-                const parts = value.split(/<br\s*\/?>|[,;]/i).map(part => part.trim()).filter(Boolean);
+                const parts = value.split(/<br\s*\/?>|;/i).map(part => part.trim()).filter(Boolean);
                 return parts.flatMap(part => {
                     const links = [...part.matchAll(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g)]
                         .map(([, title, label]) => cleanCoasterpediaCell(label || title));
@@ -1372,7 +1373,7 @@
             return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         }
 
-        function extractCoasterpediaHistoryFormerNames(wikitext, currentName = '') {
+        function extractCoasterpediaFallbackFormerNames(wikitext, currentName = '') {
             const articleText = cleanCoasterpediaCell(wikitext
                 .split(/^={2,}\s*(?:references|external links|further reading|notes)\s*={2,}\s*$/im)[0]
                 .replace(/<ref\b[^>]*>[\s\S]*?<\/ref\s*>/gi, ' ')
@@ -1384,7 +1385,8 @@
             const currentNamePattern = escapeRegExp(currentName);
             const patterns = [
                 /\b(?:opened|debuted)\b[^.!?]{0,80}\bas\s+([A-Z][A-Za-z0-9'&.-]*(?:\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})(?=\s+(?:in|on|at|before|after|when|for|but|and|\.|,)|[.!?])/g,
-                /\boriginally\s+(?:known\s+as|called|named)\s+([A-Z][A-Za-z0-9'&.-]*(?:\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})(?=\s+(?:in|on|at|before|after|when|for|but|and|\.|,)|[.!?])/g
+                /\b(?:formerly|previously|originally)\s+(?:known\s+as|called|named)\s+([A-Z][A-Za-z0-9'&.-]*(?:\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})(?=\s+(?:in|on|at|before|after|when|for|but|and|\.|,)|[.!?])/g,
+                /\b(?:renamed|changed)\s+from\s+([A-Z][A-Za-z0-9'&.-]*(?:\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})\s+to\b/g
             ];
             if (currentNamePattern) {
                 patterns.push(new RegExp(`\\b([A-Z][A-Za-z0-9'&.-]*(?:\\s+[A-Z0-9][A-Za-z0-9'&.-]*){0,4})\\s+(?:was|would be|became|got)\\s+renamed\\s+${currentNamePattern}\\b`, 'g'));
@@ -1395,19 +1397,6 @@
                     .replace(/\s+(?:was|were|is|are|would|will|could|should)\b.*$/i, '')
                     .trim())
             ).filter(name => isLikelyCoasterFormerName(name) && name.toLocaleLowerCase() !== currentName.toLocaleLowerCase()))];
-        }
-
-        function extractCoasterpediaBoldFormerNames(wikitext, currentName = '') {
-            const leadText = wikitext
-                .split(/^={2,}.*$/m)[0]
-                .replace(/<ref\b[^>]*>[\s\S]*?<\/ref\s*>/gi, ' ')
-                .replace(/<ref\b[^>]*\/\s*>/gi, ' ');
-            const explicitLeadHasAliases = /\b(?:formerly|previously|originally|known as|opened as|renamed)\b/i.test(leadText);
-            if (!explicitLeadHasAliases) return [];
-            return cleanCoasterpediaFormerNameList(
-                [...leadText.matchAll(/'''([^']{2,80})'''/g)].map(match => match[1]),
-                currentName
-            );
         }
 
         function extractCoasterpediaNameSectionFormerNames(wikitext, currentName = '') {
@@ -1712,8 +1701,13 @@
                 .filter(Boolean);
             const pastNameFieldNames = extractCoasterpediaPastNames(infobox);
             const nameSectionNames = extractCoasterpediaNameSectionFormerNames(wikitext, currentName);
-            const boldFormerNames = extractCoasterpediaBoldFormerNames(wikitext, currentName);
-            const historyFormerNames = extractCoasterpediaHistoryFormerNames(wikitext, currentName);
+            const structuredPastNames = cleanCoasterpediaFormerNameList([
+                ...pastNameFieldNames,
+                ...nameSectionNames
+            ], currentName);
+            const fallbackFormerNames = structuredPastNames.length
+                ? []
+                : extractCoasterpediaFallbackFormerNames(wikitext, currentName);
             const parkSpecificName = mainParkMatches
                 ? currentName
                 : pastNamesAtPark.at(-1) || '';
@@ -1723,11 +1717,8 @@
             const historicalNamesForPark = [...new Set([
                 ...(mainParkMatches
                     ? [
-                        ...nameHistory.map(item => item.name),
-                        ...pastNameFieldNames,
-                        ...nameSectionNames,
-                        ...boldFormerNames,
-                        ...historyFormerNames
+                        ...structuredPastNames,
+                        ...fallbackFormerNames
                     ].filter(name =>
                         name.toLocaleLowerCase() !== currentName.toLocaleLowerCase() &&
                         !namesRecordedAtOtherParks.has(name.toLocaleLowerCase())

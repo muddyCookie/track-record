@@ -421,6 +421,8 @@
             <form id="entry-form" onsubmit="saveEntry(event)" class="p-6 overflow-y-auto space-y-4 text-xs">
                 <input type="hidden" id="form-entry-id">
                 <input type="hidden" id="form-coasterpedia-ride-id">
+                <input type="hidden" id="form-coasterpedia-page-id">
+                <input type="hidden" id="form-coasterpedia-park-page-id">
                 <input type="hidden" id="form-coasterpedia-opening-date">
                 <input type="hidden" id="form-coasterpedia-closing-date">
                 <input type="hidden" id="form-ride-status" value="Unknown">
@@ -428,11 +430,11 @@
                 <!-- Park Names Row -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="block font-semibold text-slate-300 mb-1">Park Name <span class="text-slate-500 font-normal">(Optional for standalone rides)</span></label>
-                        <input type="text" id="form-park-name" placeholder="e.g. Kings Island (leave blank for a standalone ride)" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <label class="block font-semibold text-slate-300 mb-1">Park Name <span class="text-slate-500 font-normal">(optional for standalone rides)</span></label>
+                        <input type="text" id="form-park-name" oninput="document.getElementById('form-coasterpedia-park-page-id').value = ''" placeholder="e.g. Kings Island (leave blank for a standalone ride)" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-400 mb-1">Park Name When Ridden <span class="text-slate-500 font-normal">(Historic)</span></label>
+                        <label class="block font-semibold text-slate-400 mb-1">Park Name When Ridden</label>
                         <input type="text" id="form-park-ridden" placeholder="e.g. Paramount's Kings Island" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                     </div>
                 </div>
@@ -578,6 +580,6 @@
     </div>
 
     <script type="module" src="firebase-cloud.js"></script>
-    <script src="app.js?v=ride-name-display-and-locked-official-20261021-6" defer></script>
+    <script src="app.js?v=park-page-identity-refresh-20261021-8" defer></script>
 </body>
 </html>

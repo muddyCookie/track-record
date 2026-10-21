@@ -25,11 +25,6 @@
         let authStateSubscription = null;
         let cloudDataSubscription = null;
 
-        const MINOR_RIDE_NAME_ALIASES = [
-            { canonical: 'X2', names: ['X', 'X2'] },
-            { canonical: 'Wilderness Run', names: ['Jr. Gemini', 'Wilderness Run'] }
-        ];
-
         // Credit Calculation Rules Defaults
         const DEFAULT_CREDIT_RULES = {
             powered: true,
@@ -388,26 +383,8 @@
             return variant;
         }
 
-        function canonicalRideName(name = '') {
-            const normalizedName = name.toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
-            const alias = MINOR_RIDE_NAME_ALIASES.find(item =>
-                item.names.some(aliasName => aliasName.toLocaleLowerCase().replace(/[^a-z0-9]/g, '') === normalizedName)
-            );
-            return alias?.canonical || name;
-        }
-
-        function isMinorRideNameAlias(name = '') {
-            const normalizedName = name.toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
-            return MINOR_RIDE_NAME_ALIASES.some(item =>
-                item.names.some(aliasName => aliasName.toLocaleLowerCase().replace(/[^a-z0-9]/g, '') === normalizedName)
-            );
-        }
-
         function rideEntryVariant(entry) {
-            const variant = normalizeRideVariant(entry.variant);
-            return isMinorRideNameAlias(entry.coasterName || entry.coasterNameRidden) && variant !== 'Relocated'
-                ? 'Original'
-                : variant;
+            return normalizeRideVariant(entry.variant);
         }
 
         function rideVariantLabel(variant) {
@@ -419,43 +396,14 @@
             return labels[normalizedVariant] || normalizedVariant;
         }
 
-        function rideVersionVariantForName(ride, name = '') {
-            const normalizedName = name.toLocaleLowerCase();
-            const baseVariant = normalizeRideVariant(ride?.variant);
-            if (!ride || !normalizedName) return baseVariant;
-            if ((ride.name || '').toLocaleLowerCase() === normalizedName) return baseVariant;
-            if ((ride.variationChangeNames || []).some(item => item.toLocaleLowerCase() === normalizedName)) {
-                return ride.hasRelocatedHistory ? 'Relocated' : 'Original';
-            }
-            return baseVariant;
-        }
-
-        function displayRideNameForSearch(ride, searchVal = '') {
-            if (!searchVal || ride.name.toLocaleLowerCase().includes(searchVal)) return ride.name;
-            return [
-                ...rideFormerNames(ride, 'variationChangeNames'),
-                ...rideFormerNames(ride, 'sameVariationNames'),
-                ...rideFormerNames(ride)
-            ].find(name => name.toLocaleLowerCase().includes(searchVal)) || ride.name;
-        }
-
-        function cleanRideFormerNames(names = [], currentName = '') {
-            return cleanCoasterpediaFormerNameList(names, currentName);
-        }
-
-        function rideFormerNames(ride, key = 'historicalNames') {
-            return cleanRideFormerNames(ride?.[key] || [], ride?.name || '');
-        }
-
         function rideIdentityKey(entry) {
             const coasterName = entry.coasterName || entry.coasterNameRidden || '';
-            const isMinorAlias = isMinorRideNameAlias(coasterName);
             return JSON.stringify([
                 (entry.parkName || entry.parkNameRidden || '').trim().toLocaleLowerCase(),
-                canonicalRideName(coasterName).trim().toLocaleLowerCase(),
+                coasterName.trim().toLocaleLowerCase(),
                 entry.type || 'Real',
                 rideEntryVariant(entry),
-                isMinorAlias ? '' : entry.coasterpediaRideId || ''
+                entry.coasterpediaRideId || ''
             ]);
         }
 
@@ -477,7 +425,7 @@
             const duplicateKeys = new Set();
             const groupsByName = new Map();
             groups.forEach(group => {
-                const name = canonicalRideName((group.entry.coasterName || group.entry.coasterNameRidden || '').trim()).toLocaleLowerCase();
+                const name = (group.entry.coasterName || group.entry.coasterNameRidden || '').trim().toLocaleLowerCase();
                 if (!name) {
                     if (rideEntryVariant(group.entry) === 'Relocated') duplicateKeys.add(group.key);
                     return;
@@ -698,7 +646,6 @@
                 const entry = group.entry;
                 const matchSearch = group.entries.some(item =>
                     (item.coasterName || '').toLowerCase().includes(searchVal) ||
-                    (item.coasterNameRidden || '').toLowerCase().includes(searchVal) ||
                     (item.parkName || '').toLowerCase().includes(searchVal) ||
                     (item.parkNameRidden || '').toLowerCase().includes(searchVal) ||
                     (item.notes || '').toLowerCase().includes(searchVal)
@@ -757,14 +704,6 @@
             let html = '';
             filtered.forEach(group => {
                 const entry = group.entry;
-                const coasterDisplayName = entry.coasterNameRidden && entry.coasterNameRidden !== entry.coasterName 
-                    ? entry.coasterNameRidden 
-                    : entry.coasterName;
-                
-                const showCoasterBadge = entry.coasterNameRidden && entry.coasterNameRidden !== entry.coasterName;
-                const historicalLogNames = [...new Set(group.entries
-                    .map(item => item.coasterNameRidden || item.coasterName)
-                    .filter(name => name && name !== entry.coasterName))];
                 const openingEntry = group.entries.find(item => item.coasterpediaOpeningDate || item.coasterpediaClosingDate);
                 const operatingDates = [openingEntry?.coasterpediaOpeningDate, openingEntry?.coasterpediaClosingDate]
                     .map(formatCoasterpediaYear)
@@ -782,10 +721,8 @@
                     <div class="bg-cardbg rounded-2xl border border-bordercolor p-4 hover:border-slate-700 transition flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                         <div class="space-y-1.5 flex-grow">
                             <div class="flex items-center gap-2 flex-wrap">
-                                <h4 class="text-base font-bold text-white">${escapeHtml(coasterDisplayName)}</h4>
-                                ${showCoasterBadge ? `<span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-bordercolor" title="Current Official Name">Now: ${escapeHtml(entry.coasterName)}</span>` : ''}
+                                <h4 class="text-base font-bold text-white">${escapeHtml(entry.coasterName)}</h4>
                             </div>
-                            ${historicalLogNames.length ? `<p class="text-[11px] text-slate-500">Previously logged as ${historicalLogNames.map(escapeHtml).join(', ')}</p>` : ''}
                             <div class="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
                                 ${rideDateTime ? `<span><i class="fa-regular fa-calendar mr-1"></i>${escapeHtml(rideDateTime)}</span>` : ''}
                                 <span class="rounded-md border border-slate-700 px-2 py-0.5 text-[10px] uppercase tracking-wide">${escapeHtml(rideStatus)}</span>
@@ -986,27 +923,12 @@
 
         function hasCoasterpediaCoasterSections(wikitext) {
             const headings = [...wikitext.matchAll(/^(={2,6})\s*(.*?)\s*\1\s*$/gm)]
-                .map(match => ({
-                    level: match[1].length,
-                    title: match[2].trim().replace(/_/g, ' ')
+                .map((match, index) => ({
+                    hLevel: match[1].length,
+                    line: match[2].trim().replace(/_/g, ' '),
+                    index: String(index + 1)
                 }));
-            let era = null;
-
-            for (const heading of headings) {
-                if (heading.level === 2) {
-                    era = coasterpediaCoasterEra(heading.title);
-                    if (coasterpediaCoasterListHeadingEra(heading.title) ||
-                        /^(?:roller\s+)?coasters?$/i.test(heading.title)) {
-                        return true;
-                    }
-                } else if (heading.level === 3 && /^(?:roller\s+)?coasters?$/i.test(heading.title) && era) {
-                    return true;
-                } else if (heading.level === 3 && /^roller coasters$/i.test(heading.title)) {
-                    return true;
-                }
-            }
-
-            return false;
+            return findCoasterpediaSections(headings).length > 0;
         }
 
         function coasterpediaCoasterEra(heading) {
@@ -1066,7 +988,7 @@
             try {
                 currentParkRides = await fetchCoasterpediaParkRides(selectedPage.title);
                 if (requestId !== searchRequestId) return;
-                await addFormerRideAliases();
+                await enrichCoasterRideDetails();
                 if (requestId !== searchRequestId) return;
 
                 if (currentParkRides.length === 0) {
@@ -1119,7 +1041,7 @@
                     action: 'parse',
                     page: parkTitle,
                     section: section.index,
-                    prop: 'wikitext',
+                    prop: 'text|wikitext',
                     format: 'json',
                     origin: '*'
                 });
@@ -1128,11 +1050,15 @@
                     throw new Error(`Coasterpedia coaster list failed with status ${sectionResponse.status}`);
                 }
                 const sectionData = await sectionResponse.json();
-                return parseCoasterpediaCoasters(
-                    sectionData.parse?.wikitext?.['*'] || '',
+                const parsed = sectionData.parse || {};
+                const renderedRides = parseCoasterpediaRenderedCoasters(
+                    parsed.text?.['*'] || '',
                     parkTitle,
                     section.status
                 );
+                return renderedRides.length
+                    ? renderedRides
+                    : parseCoasterpediaCoasters(parsed.wikitext?.['*'] || '', parkTitle, section.status);
             }))).flat();
             if (rides.length === 0) {
                 throw new Error(`No coaster entries were found in "${parkTitle}".`);
@@ -1144,9 +1070,7 @@
             const ridesByName = new Map();
             rides.forEach(ride => {
                 const status = ride.entityType.startsWith('Former') ? 'Former' : 'Present';
-                [ride.name, ...rideFormerNames(ride)].forEach(name => {
-                    ridesByName.set(normalizeRideStatusName(name), status);
-                });
+                ridesByName.set(normalizeRideStatusName(ride.name), status);
             });
 
             let updatedCount = 0;
@@ -1154,7 +1078,7 @@
                 const entryPark = (entry.parkName || entry.parkNameRidden || '').trim();
                 if (entryPark.toLocaleLowerCase() !== parkTitle.toLocaleLowerCase()) return;
 
-                const names = [entry.coasterName, entry.coasterNameRidden].filter(Boolean);
+                const names = [entry.coasterName].filter(Boolean);
                 const matchingStatus = names.map(name => {
                     const normalizedName = normalizeRideStatusName(name);
                     const exactStatus = ridesByName.get(normalizedName);
@@ -1215,24 +1139,81 @@
 
         function findCoasterpediaSections(sections) {
             const coasterSections = [];
-            let era = null;
+            const headingStack = [];
 
             sections.forEach(section => {
-                const heading = section.line.trim();
-                if (section.hLevel === 2) {
-                    era = coasterpediaCoasterEra(heading);
-                    const directEra = coasterpediaCoasterListHeadingEra(heading);
-                    if (directEra) {
-                        coasterSections.push({ index: section.index, status: directEra });
-                    } else if (/^(?:roller\s+)?coasters?$/i.test(heading)) {
-                        coasterSections.push({ index: section.index, status: 'Present' });
-                    }
-                } else if (section.hLevel === 3 && /^(?:roller\s+)?coasters?$/i.test(heading) && era) {
-                    coasterSections.push({ index: section.index, status: era });
+                const level = Number(section.hLevel);
+                const heading = String(section.line || '').replace(/<[^>]*>/g, '').trim()
+                    .replace(/&amp;/gi, '&').replace(/&#0*39;|&apos;/gi, "'")
+                    .replace(/&quot;/gi, '"').replace(/&nbsp;/gi, ' ');
+                while (headingStack.length && headingStack.at(-1).level >= level) headingStack.pop();
+
+                const directEra = coasterpediaCoasterListHeadingEra(heading);
+                if (directEra || /^(?:roller\s+)?coasters?$/i.test(heading)) {
+                    const ancestorEra = headingStack.slice().reverse()
+                        .map(item => coasterpediaCoasterEra(item.title))
+                        .find(Boolean);
+                    coasterSections.push({
+                        index: section.index,
+                        status: directEra || ancestorEra || 'Present'
+                    });
                 }
+
+                headingStack.push({ level, title: heading });
             });
 
             return coasterSections;
+        }
+
+        function parseCoasterpediaRenderedCoasters(html, parkName, status) {
+            const documentNode = new DOMParser().parseFromString(html, 'text/html');
+            const seenTitles = new Set();
+            const rides = [];
+
+            documentNode.querySelectorAll('table').forEach(table => {
+                const rows = [...table.querySelectorAll('tr')];
+                const headerRow = rows.find(row => row.querySelector('th'));
+                const headers = headerRow
+                    ? [...headerRow.children]
+                        .filter(cell => cell.tagName === 'TH' || cell.tagName === 'TD')
+                        .map(cell => cell.textContent.trim().toLowerCase())
+                    : [];
+                const nameColumn = headers.findIndex(header => /^(?:name|coaster|roller coaster)$/.test(header));
+                const classColumn = headers.findIndex(header => /^(?:class|category|ride type)$/.test(header));
+
+                rows.forEach(row => {
+                    if (row === headerRow || /never operated/i.test(row.textContent)) return;
+                    const cells = [...row.children].filter(cell => cell.tagName === 'TH' || cell.tagName === 'TD');
+                    if (!cells.length) return;
+                    const nameCell = cells[nameColumn >= 0 ? nameColumn : 0];
+                    const link = nameCell?.querySelector('a[href*="/wiki/"]');
+                    const name = link?.textContent.trim();
+                    if (!link || !name) return;
+
+                    const pageTitle = (link.getAttribute('title') || link.pathname.split('/wiki/').pop() || '')
+                        .replace(/_/g, ' ');
+                    let decodedTitle = pageTitle;
+                    try { decodedTitle = decodeURIComponent(pageTitle); } catch {}
+                    const titleKey = decodedTitle.toLocaleLowerCase();
+                    if (!decodedTitle || seenTitles.has(titleKey)) return;
+                    seenTitles.add(titleKey);
+
+                    const rideClass = cells[classColumn]?.textContent.trim() || '';
+                    rides.push({
+                        id: decodedTitle,
+                        sourceRideId: decodedTitle,
+                        name,
+                        pageTitle: decodedTitle,
+                        entityType: `${status} coaster`,
+                        parkName,
+                        type: classifyCoasterpediaRide(rideClass),
+                        rideType: cleanCoasterpediaCell(rideClass) || classifyRideLabel(''),
+                        variant: /\bvr$/i.test(name) ? 'ElementChange' : 'Original'
+                    });
+                });
+            });
+
+            return rides;
         }
 
         function parseCoasterpediaCoasters(wikitext, parkName, status) {
@@ -1527,7 +1508,7 @@
             return 'Real';
         }
 
-        async function addFormerRideAliases() {
+        async function enrichCoasterRideDetails() {
             const pageTitles = [...new Set(currentParkRides.map(ride => ride.pageTitle))];
             if (pageTitles.length === 0) return;
 
@@ -1542,15 +1523,15 @@
             });
             const redirectResponse = await fetch(`https://coasterpedia.net/w/api.php?${redirectParams}`);
             if (!redirectResponse.ok) {
-                throw new Error(`Coasterpedia alternate-name lookup failed with status ${redirectResponse.status}`);
+                throw new Error(`Coasterpedia page redirect lookup failed with status ${redirectResponse.status}`);
             }
 
             const redirectData = await redirectResponse.json();
-            const canonicalTitleByAlias = new Map();
+            const canonicalTitleByRequestedTitle = new Map();
             Object.values(redirectData.query?.pages || {}).forEach(page => {
-                canonicalTitleByAlias.set(page.title.toLocaleLowerCase(), page.title);
+                canonicalTitleByRequestedTitle.set(page.title.toLocaleLowerCase(), page.title);
                 (page.redirects || []).forEach(redirect => {
-                    canonicalTitleByAlias.set(redirect.title.toLocaleLowerCase(), page.title);
+                    canonicalTitleByRequestedTitle.set(redirect.title.toLocaleLowerCase(), page.title);
                 });
             });
 
@@ -1581,7 +1562,7 @@
             }
 
             currentParkRides.forEach(ride => {
-                const canonicalTitle = canonicalTitleByAlias.get(ride.pageTitle.toLocaleLowerCase()) || ride.pageTitle;
+                const canonicalTitle = canonicalTitleByRequestedTitle.get(ride.pageTitle.toLocaleLowerCase()) || ride.pageTitle;
                 const details = articlesByTitle.get(canonicalTitle.toLocaleLowerCase());
                 ride.pageTitle = canonicalTitle;
                 ride.sourceRideId = canonicalTitle;
@@ -1596,12 +1577,6 @@
                 ride.hasRelocatedHistory = details.hasRelocatedHistory;
                 ride.openingDate = details.openingDate;
                 ride.closingDate = details.closingDate;
-                ride.nameHistory = details.nameHistory;
-                ride.currentName = details.currentName;
-                if (details.parkSpecificName) ride.name = details.parkSpecificName;
-                ride.historicalNames = cleanRideFormerNames(details.historicalNamesForPark, details.parkSpecificName || ride.name);
-                ride.sameVariationNames = cleanRideFormerNames(details.sameVariationNamesForPark, details.parkSpecificName || ride.name);
-                ride.variationChangeNames = cleanRideFormerNames(details.variationChangeNamesForPark, details.parkSpecificName || ride.name);
                 if (details.tracks < 2) return;
                 ride.trackCount = details.tracks;
                 ride.trackNames = details.tracks === 2 && ride.name.toLowerCase() === 'gemini'
@@ -1609,8 +1584,7 @@
                     : Array.from({ length: details.tracks }, (_, index) => `Track ${index + 1}`);
             });
 
-            collapseCoasterHistoryAliases();
-            collapseMinorRideAliases();
+            collapseDuplicateCoasterPages();
             currentParkRides = currentParkRides.flatMap(ride => {
                 if (!ride.trackNames) return [ride];
                 return ride.trackNames.map((trackName, index) => ({
@@ -1624,7 +1598,7 @@
             });
         }
 
-        function collapseCoasterHistoryAliases() {
+        function collapseDuplicateCoasterPages() {
             const ridesByIdentity = new Map();
             currentParkRides.forEach(ride => {
                 const identity = (ride.sourceRideId || ride.pageTitle || ride.id).toLocaleLowerCase();
@@ -1639,24 +1613,9 @@
                 }
 
                 const canonicalRide = rides.find(ride => ride.entityType === 'Present coaster') || rides[0];
-                const parkName = canonicalRide.name;
-                canonicalRide.historicalNames = [...new Set(rides.flatMap(ride => [
-                    ride.name,
-                    ...(ride.historicalNames || [])
-                ]))].filter(name =>
-                    isLikelyCoasterFormerName(name) &&
-                    name.toLocaleLowerCase() !== parkName.toLocaleLowerCase()
-                );
-                canonicalRide.sameVariationNames = [...new Set(
-                    rides.flatMap(ride => ride.sameVariationNames || [])
-                )].filter(isLikelyCoasterFormerName);
-                canonicalRide.variationChangeNames = [...new Set(
-                    rides.flatMap(ride => ride.variationChangeNames || [])
-                )].filter(isLikelyCoasterFormerName);
                 if (rides.some(ride => ride.entityType === 'Present coaster')) {
                     canonicalRide.entityType = 'Present coaster';
                 }
-                canonicalRide.name = parkName;
                 canonicalRide.hasRelocatedHistory = rides.some(ride => ride.hasRelocatedHistory || ride.variant === 'Relocated');
                 canonicalRide.variant = rides.some(ride => ride.variant === 'ElementChange')
                         ? 'ElementChange'
@@ -1666,56 +1625,6 @@
                 canonicalRide.hasReimaginedVersion = false;
                 return canonicalRide;
             });
-        }
-
-        function collapseMinorRideAliases() {
-            MINOR_RIDE_NAME_ALIASES.forEach(({ canonical: currentName, names }) => {
-                const formerName = names.find(name =>
-                    name.toLocaleLowerCase() !== currentName.toLocaleLowerCase()
-                );
-                const matchingRides = currentParkRides.filter(ride =>
-                    [currentName, formerName].some(name =>
-                        ride.name.toLocaleLowerCase() === name.toLocaleLowerCase()
-                    )
-                );
-                const canonicalRide = matchingRides.find(ride =>
-                    ride.name.toLocaleLowerCase() === currentName.toLocaleLowerCase() &&
-                    ride.entityType === 'Present coaster'
-                ) || matchingRides.find(ride =>
-                    ride.name.toLocaleLowerCase() === currentName.toLocaleLowerCase()
-                );
-                if (!canonicalRide || matchingRides.length < 2) return;
-
-                canonicalRide.historicalNames = [...new Set([
-                    ...(canonicalRide.historicalNames || []),
-                    formerName,
-                    ...matchingRides
-                        .filter(ride => ride !== canonicalRide)
-                        .flatMap(ride => ride.historicalNames || [])
-                ])].filter(isLikelyCoasterFormerName);
-                canonicalRide.sameVariationNames = [...new Set([
-                    ...(canonicalRide.sameVariationNames || []),
-                    formerName,
-                    ...matchingRides
-                        .filter(ride => ride !== canonicalRide)
-                        .flatMap(ride => ride.sameVariationNames || [])
-                ])].filter(isLikelyCoasterFormerName);
-                currentParkRides = currentParkRides.filter(ride =>
-                    !matchingRides.includes(ride) || ride === canonicalRide
-                );
-            });
-
-        }
-
-        function isNameOnlyRideChange(currentName, formerName) {
-            const normalize = name => name.toLowerCase().replace(/[^a-z0-9]/g, '');
-            const current = normalize(currentName);
-            const former = normalize(formerName);
-            return current === former ||
-                MINOR_RIDE_NAME_ALIASES.some(item => {
-                    const names = item.names.map(normalize);
-                    return names.includes(current) && names.includes(former);
-                });
         }
 
         function extractCoasterpediaInfoboxDetails(wikitext, selectedParkName = '') {
@@ -1741,7 +1650,6 @@
                     return {
                         park: cleanCoasterpediaCell(parkField),
                         parkNames: extractCoasterpediaLinkedNames(parkField),
-                        name: cleanCoasterpediaCell(pastInfobox.match(/^[ \t]*\|name\s*=\s*(.+)$/im)?.[1] || ''),
                         opened: cleanCoasterpediaCell(pastInfobox.match(/^[ \t]*\|opened\s*=\s*(.+)$/im)?.[1] || ''),
                         wikitext: pastInfobox
                     };
@@ -1761,52 +1669,6 @@
             const mainParkMatches = Boolean(parkNameKey &&
                 (mainParkKey === parkNameKey || extractCoasterpediaLinkedNames(mainParkField)
                     .some(name => name.toLocaleLowerCase().replace(/[^a-z0-9]/g, '') === parkNameKey)));
-            const pastNamesAtPark = pastInfoboxes
-                .filter(matchesSelectedPark)
-                .map(item => item.name)
-                .filter(Boolean);
-            const pastNameFieldNames = cleanCoasterpediaFormerNameList([
-                ...extractCoasterpediaPastNames(infobox),
-                ...extractCoasterpediaPastNamesParsed(infobox)
-            ], currentName);
-            const nameSectionNames = extractCoasterpediaNameSectionFormerNames(wikitext, currentName);
-            const structuredSectionNames = cleanCoasterpediaFormerNameList(nameSectionNames, currentName);
-            const infoboxNameHistoryNames = cleanCoasterpediaFormerNameList(
-                nameHistory.map(item => item.name),
-                currentName
-            );
-            const structuredPastNames = pastNameFieldNames.length
-                ? pastNameFieldNames
-                : structuredSectionNames.length
-                    ? structuredSectionNames
-                    : infoboxNameHistoryNames;
-            const articleFormerNames = structuredPastNames.length
-                ? []
-                : extractCoasterpediaFallbackFormerNames(wikitext, currentName);
-            const parkSpecificName = mainParkMatches
-                ? currentName
-                : pastNamesAtPark.at(-1) || '';
-            const namesRecordedAtOtherParks = new Set(pastInfoboxes
-                .filter(item => !matchesSelectedPark(item))
-                .map(item => item.name.toLocaleLowerCase()));
-            const selectedParkKey = selectedParkName.toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
-            const historicalNamesForPark = [...new Set([
-                ...(mainParkMatches
-                    ? [
-                        ...structuredPastNames,
-                        ...articleFormerNames
-                    ].filter(name =>
-                        name.toLocaleLowerCase() !== currentName.toLocaleLowerCase() &&
-                        !namesRecordedAtOtherParks.has(name.toLocaleLowerCase())
-                    )
-                    : []),
-                ...pastNamesAtPark
-            ])].map(name => name.replace(/\s*\(([^()]*)\)\s*$/, (suffix, disambiguator) =>
-                disambiguator.toLocaleLowerCase().replace(/[^a-z0-9]/g, '') === selectedParkKey ? '' : suffix
-            )).filter(name =>
-                isLikelyCoasterFormerName(name) &&
-                name.toLocaleLowerCase() !== parkSpecificName.toLocaleLowerCase()
-            );
             const pastParkInfobox = pastInfoboxes.find(item =>
                 matchesSelectedPark(item)
             );
@@ -1817,26 +1679,8 @@
                 : pastParkInfobox?.wikitext || '';
             const changeEvidence = getCoasterpediaChangeEvidence(wikitext);
             const changeClassification = classifyCoasterpediaChange(wikitext, infobox, nameHistory);
-            const variationChangeNames = changeClassification === 'reimagined'
-                ? historicalNamesForPark
-                    .filter(name =>
-                        name.toLocaleLowerCase() !== currentName.toLocaleLowerCase() &&
-                        !isNameOnlyRideChange(currentName, name)
-                    )
-                : [];
             const currentVersionStart = nameHistory.find(item => item.name === currentName)?.from || '';
-            const variationChangeNameSet = new Set(variationChangeNames.map(name => name.toLocaleLowerCase()));
-            const sameVariationNamesForPark = historicalNamesForPark.filter(name =>
-                !variationChangeNameSet.has(name.toLocaleLowerCase())
-            );
             return {
-                nameHistory,
-                currentName,
-                parkSpecificName,
-                historicalNamesForPark,
-                sameVariationNamesForPark,
-                variationChangeNamesForPark: variationChangeNames,
-                isFormerParkEntry: Boolean(!mainParkMatches && pastNamesAtPark.length),
                 tracks: trackCount ? Number(trackCount[1]) : 1,
                 openingDate: parseCoasterpediaDate(dateInfobox.match(/^[ \t]*\|opened\s*=\s*(.+)$/im)?.[1] || ''),
                 closingDate: parseCoasterpediaDate(dateInfobox.match(/^[ \t]*\|closed\s*=\s*(.+)$/im)?.[1] || ''),
@@ -1996,8 +1840,7 @@
             const searchVal = document.getElementById('ride-search-filter').value.toLowerCase().trim();
 
             const filtered = currentParkRides.filter(ride =>
-                [ride.name, ...rideFormerNames(ride)]
-                    .some(name => name.toLocaleLowerCase().includes(searchVal))
+                ride.name.toLocaleLowerCase().includes(searchVal)
             );
             const distinctRideIdsByName = new Map();
             currentParkRides.forEach(ride => {
@@ -2028,24 +1871,17 @@
                         <div class="divide-y divide-bordercolor/70 border-t border-bordercolor">
                 `;
                 section.rides.forEach(ride => {
-                    const historicalNames = rideFormerNames(ride);
-                    const searchableRideNames = [ride.name, ...historicalNames]
-                        .map(name => name.toLocaleLowerCase());
                     const rideSourceId = ride.sourceRideId || ride.id;
                     const sameNameRideCount = distinctRideIdsByName.get(ride.name.toLocaleLowerCase())?.size || 1;
-                    const displayedRideName = displayRideNameForSearch(ride, searchVal);
-                    const isHistoricalDisplayName = displayedRideName.toLocaleLowerCase() !== ride.name.toLocaleLowerCase();
-                    const displayedVariant = rideVersionVariantForName(ride, displayedRideName);
+                    const displayedRideName = ride.name;
+                    const displayedVariant = normalizeRideVariant(ride.variant);
                     const matchingParkEntries = coasterLog.filter(entry =>
                         (entry.parkName || entry.parkNameRidden || '').toLocaleLowerCase() === ride.parkName.toLocaleLowerCase() &&
-                        [entry.coasterName, entry.coasterNameRidden]
-                            .filter(Boolean)
-                            .some(name => searchableRideNames.includes(name.toLocaleLowerCase()))
+                        (entry.coasterpediaRideId === rideSourceId ||
+                            (entry.coasterName || '').toLocaleLowerCase() === ride.name.toLocaleLowerCase())
                     );
                     const entryMatchesDisplayedName = entry =>
-                        [entry.coasterName, entry.coasterNameRidden]
-                            .filter(Boolean)
-                            .some(name => name.toLocaleLowerCase() === displayedRideName.toLocaleLowerCase());
+                        (entry.coasterName || '').toLocaleLowerCase() === displayedRideName.toLocaleLowerCase();
                     const loggedEntry = matchingParkEntries.find(entry =>
                         entry.coasterpediaRideId === rideSourceId &&
                         rideEntryVariant(entry) === displayedVariant &&
@@ -2089,8 +1925,6 @@
                                         ? `<span class="rounded-md border ${variant === 'ElementChange' ? 'border-violet-500/20 bg-violet-500/10 text-violet-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-300'} px-2 py-0.5 text-[10px] font-semibold">${escapeHtml(rideVariantLabel(variant))}</span>`
                                         : ''}
                                 </div>
-                                ${isHistoricalDisplayName ? `<p class="mt-1 text-[11px] text-slate-500">Current name ${escapeHtml(ride.name)}</p>` : ''}
-                                ${!isHistoricalDisplayName && historicalNames.length ? `<p class="mt-1 text-[11px] text-slate-500">Previously known as ${historicalNames.map(escapeHtml).join(', ')}</p>` : ''}
                                 ${ride.hasReimaginedVersion ? `<p class="mt-1 text-[11px] text-violet-300">Coasterpedia history indicates a substantial ride change${ride.changeYear ? ` around ${escapeHtml(ride.changeYear)}` : ''}; you can log the reimagined version separately.</p>` : ''}
                                 ${dateLabel}
                                 ${sameNameRideCount > 1 && matchingParkEntries.some(entry => !entry.coasterpediaRideId)
@@ -2132,8 +1966,7 @@
             if (!openAddModal()) return;
             document.getElementById('form-park-name').value = parkName;
             document.getElementById('form-park-ridden').value = '';
-            document.getElementById('form-coaster-ridden').value = '';
-            setRiddenCoasterNameOptions();
+            document.getElementById('form-coaster-ridden').value = rideName;
             document.getElementById('form-coaster-type').value = type;
             document.getElementById('form-variant-type').value = normalizeRideVariant(variant);
             document.getElementById('form-ride-status').value = status;
@@ -2145,7 +1978,6 @@
             );
             setRideNameVersionOptions(ride);
             selectOfficialCoasterName(rideName);
-            setRiddenCoasterNameOptions(ride);
         }
 
         function setRideNameVersionOptions(ride = null, fallbackName = '', fallbackType = 'Real', fallbackVariant = 'Original') {
@@ -2154,14 +1986,8 @@
             const nameInput = document.getElementById('form-coaster-name');
             if (!select) return;
             const names = [
-                ...(ride ? [
-                    { name: ride.name, variant: normalizeRideVariant(ride.variant) },
-                    ...rideFormerNames(ride, 'variationChangeNames').map(name => ({
-                        name,
-                        variant: rideVersionVariantForName(ride, name)
-                    }))
-                ] : []),
-                ...(fallbackName ? [{ name: fallbackName, variant: normalizeRideVariant(fallbackVariant) }] : [])
+                ...(ride ? [{ name: ride.name, variant: normalizeRideVariant(ride.variant) }] : []),
+                ...(!ride && fallbackName ? [{ name: fallbackName, variant: normalizeRideVariant(fallbackVariant) }] : [])
             ];
             const options = [...new Map(names.map(option =>
                 [option.name.toLocaleLowerCase(), option]
@@ -2206,37 +2032,6 @@
             updateRideClassificationFromName();
         }
 
-        function setRiddenCoasterNameOptions(ride = null, selectedName = '') {
-            const select = document.getElementById('form-coaster-ridden-option');
-            const nameInput = document.getElementById('form-coaster-ridden');
-            const names = rideFormerNames(ride, 'sameVariationNames');
-            if (!select || !nameInput) return;
-            nameInput.value = selectedName;
-            select.innerHTML = `${names.length ? '<option value="">Select a former name (optional)</option>' : ''}${names
-                .map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
-                .join('')}<option value="__custom__">Other name…</option>`;
-            const matchingName = names.find(name =>
-                name.toLocaleLowerCase() === selectedName.toLocaleLowerCase()
-            );
-            select.value = matchingName || (names.length && !selectedName ? '' : '__custom__');
-            select.classList.remove('hidden');
-            nameInput.classList.toggle('hidden', Boolean(matchingName) || (names.length > 0 && !selectedName));
-            nameInput.classList.add('mt-2');
-        }
-
-        function selectRiddenCoasterName() {
-            const select = document.getElementById('form-coaster-ridden-option');
-            const nameInput = document.getElementById('form-coaster-ridden');
-            if (select.value === '__custom__') {
-                nameInput.value = '';
-                nameInput.classList.remove('hidden');
-                nameInput.focus();
-                return;
-            }
-            nameInput.value = select.value;
-            nameInput.classList.add('hidden');
-        }
-
         function updateRideClassificationFromName() {
             const option = rideNameVersionOptions.get(
                 document.getElementById('form-coaster-name').value.trim().toLocaleLowerCase()
@@ -2254,7 +2049,6 @@
             relogInitialCoasterName = '';
             relogVersionManuallySelected = false;
             setRideNameVersionOptions();
-            setRiddenCoasterNameOptions();
             document.getElementById('modal-entry-title').innerHTML = `<i class="fa-solid fa-pen-to-square text-brand-500"></i> Add Log Entry`;
             document.getElementById('form-entry-submit').textContent = 'Save Ride Entry';
             document.getElementById('form-entry-id').value = '';
@@ -2321,10 +2115,9 @@
                 rideEntryVariant(entry)
             );
             selectOfficialCoasterName(entry.coasterName || '__custom__');
-            setRiddenCoasterNameOptions(
-                matchingRide,
-                entry.coasterNameRidden || entry.coasterName || ''
-            );
+            if (entry.coasterName && !rideNameVersionOptions.has(entry.coasterName.toLocaleLowerCase())) {
+                document.getElementById('form-coaster-name').value = entry.coasterName;
+            }
 
             document.getElementById('modal-entry').classList.remove('hidden');
             return true;
@@ -2348,8 +2141,7 @@
                     rideDetails.variant
                 );
                 selectOfficialCoasterName(rideDetails.name);
-                document.getElementById('form-coaster-ridden').value = '';
-                setRiddenCoasterNameOptions(ride);
+                document.getElementById('form-coaster-ridden').value = rideDetails.name;
                 document.getElementById('form-ride-status').value = rideDetails.status;
                 document.getElementById('form-coaster-type').value = rideDetails.type;
                 document.getElementById('form-variant-type').value = normalizeRideVariant(rideDetails.variant);
@@ -2464,6 +2256,10 @@
             const coasterpediaOpeningDate = document.getElementById('form-coasterpedia-opening-date').value;
             const coasterpediaClosingDate = document.getElementById('form-coasterpedia-closing-date').value;
             const savedAt = new Date();
+
+            if (!id && !relogSourceEntryId && !coasterNameRidden) {
+                coasterNameRidden = coasterName;
+            }
 
             if (relogSourceEntryId) {
                 const sourceGroup = getCoasterLogGroups().find(group =>

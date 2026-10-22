@@ -2024,7 +2024,7 @@
             const rideType = '(?:floorless|stand[ -]?up|sit[ -]?down|inverted|launched|wood(?:en)?|steel|flying|wing|suspended|spinning|pipeline|4d)';
             const changeAction = '(?:conversion|convert(?:ed|s|ing)?|switch(?:ed|es|ing)?|chang(?:e|ed|es|ing)|replac(?:e|ed|es|ing)|transform(?:ed|s|ing)|transition(?:ed|s|ing))';
             const typeTransition = new RegExp(`\\b${rideType}\\b[^.!?\\n]{0,100}\\b${changeAction}\\b[^.!?\\n]{0,100}\\b${rideType}\\b`, 'i');
-            const transitionToType = new RegExp(`\\b${changeAction}\\b[^.!?\\n]{0,100}\\b${rideType}\\b`, 'i');
+            const transitionToType = new RegExp(`\\b${changeAction}\\b[^.!?\\n]{0,60}\\b(?:to|into)\\s+(?:an?\\s+)?\\b${rideType}\\b`, 'i');
             const typeConversion = new RegExp(`\\b${rideType}\\s+conversion\\b|\\bconversion\\b[^.!?\\n]{0,80}\\b${rideType}\\b`, 'i');
             return typeTransition.test(sentence) || transitionToType.test(sentence) || typeConversion.test(sentence);
         }

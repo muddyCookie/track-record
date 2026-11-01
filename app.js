@@ -1096,12 +1096,15 @@
             return { pageTitle: match ? match[1] : String(value), trackIdSuffix: match?.[2] || '' };
         }
 
-        function coasterpediaRideBaseName(name = '') {
-            return String(name).replace(/\s+\((?:red track|blue track|left track|right track|track \d+)\)$/i, '').trim();
+        function coasterpediaRideBaseName(name = '', rideId = '') {
+            const trackSuffix = String(rideId).match(/::track-\d+$/i)
+                ? /\s+\([^()]+\)$/
+                : /\s+\((?:red track|blue track|left track|right track|track \d+)\)$/i;
+            return String(name).replace(trackSuffix, '').trim();
         }
 
-        function coasterpediaRideNameSuffix(name = '') {
-            return String(name).match(/\s+\((?:red track|blue track|left track|right track|track \d+)\)$/i)?.[0] || '';
+        function coasterpediaRideNameSuffix(name = '', rideId = '') {
+            return String(name).slice(coasterpediaRideBaseName(name, rideId).length);
         }
 
         async function resolveCoasterpediaPageReferences(titles) {
@@ -1181,7 +1184,7 @@
                     ride.id = ride.sourceRideId;
                 }
 
-                const rideName = coasterpediaRideBaseName(ride.name);
+                const rideName = coasterpediaRideBaseName(ride.name, ride.sourceRideId || ride.id);
                 const rideStatus = coasterStatusForRide(ride);
                 const rideDetails = {
                     pageId: ride.coasterpediaPageId || '',
@@ -1221,7 +1224,10 @@
                     : null;
                 const identityMatched = Boolean(rideDetails);
                 if (!rideDetails) {
-                    const candidates = ridesByName.get(normalizeRideStatusName(coasterpediaRideBaseName(entry.coasterName || ''))) || [];
+                    const candidates = ridesByName.get(normalizeRideStatusName(coasterpediaRideBaseName(
+                        entry.coasterName || '',
+                        entry.coasterpediaRideId || ''
+                    ))) || [];
                     if (candidates.length === 1) rideDetails = candidates[0];
                 }
                 if (!rideDetails) {
@@ -1234,7 +1240,10 @@
                         entry.coasterpediaPageId = resolvedSavedReference.pageId;
                         changed = true;
                     }
-                    const updatedName = `${rideDetails.name}${coasterpediaRideNameSuffix(entry.coasterName)}`;
+                    const updatedName = `${rideDetails.name}${coasterpediaRideNameSuffix(
+                        entry.coasterName,
+                        entry.coasterpediaRideId
+                    )}`;
                     if (updatedName && entry.coasterName !== updatedName) {
                         entry.coasterName = updatedName;
                         changed = true;
@@ -1839,11 +1848,13 @@
                 }
                 if (details.tracks < 2) return;
                 ride.trackCount = details.tracks;
-                ride.trackNames = details.tracks === 2 && ride.name.toLowerCase() === 'gemini'
-                    ? ['Red Track', 'Blue Track']
-                    : details.tracks === 2
-                        ? ['Left Track', 'Right Track']
-                        : Array.from({ length: details.tracks }, (_, index) => `Track ${index + 1}`);
+                ride.trackNames = details.trackNames.length >= details.tracks
+                    ? details.trackNames
+                    : details.tracks === 2 && ride.name.toLowerCase() === 'gemini'
+                        ? ['Red Track', 'Blue Track']
+                        : details.tracks === 2
+                            ? ['Left Track', 'Right Track']
+                            : Array.from({ length: details.tracks }, (_, index) => `Track ${index + 1}`);
             });
 
             collapseDuplicateCoasterPages();
@@ -1854,6 +1865,7 @@
                     id: `${ride.id}::track-${index + 1}`,
                     sourceRideId: `${ride.sourceRideId}::track-${index + 1}`,
                     name: `${ride.name} (${trackName})`,
+                    trackName,
                     trackIndex: index + 1,
                     trackNames: undefined
                 }));
@@ -1890,7 +1902,9 @@
         }
 
         function extractCoasterpediaInfoboxDetails(wikitext, selectedParkName = '') {
-            const infobox = wikitext.match(/\{\{Infobox roller coaster\b([\s\S]*?)^\}\}/im)?.[1] || '';
+            const infoboxMatch = wikitext.match(/\{\{Infobox (roller coaster|coaster multitrack)\b([\s\S]*?)^\}\}/im);
+            const infoboxType = infoboxMatch?.[1].toLocaleLowerCase() || '';
+            const infobox = infoboxMatch?.[2] || '';
             const infoboxName = cleanCoasterpediaCell(infobox.match(/^\|name\s*=\s*(.+)$/im)?.[1] || '');
             const nameRows = [...infobox.matchAll(/^\|name(\d*)\s*=\s*(.+)$/gim)];
             const hasFirstNumberedName = nameRows.some(match => match[1] === '1');
@@ -1905,6 +1919,10 @@
                 };
             }).filter(item => item.name);
             const trackCount = infobox.match(/^\|tracks?\s*=\s*(\d+)/im);
+            const namedTracks = [...infobox.matchAll(/^\|track(\d+)_name\s*=\s*(.+)$/gim)]
+                .sort((first, second) => Number(first[1]) - Number(second[1]))
+                .map(match => cleanCoasterpediaCell(match[2]))
+                .filter(Boolean);
             const pastInfoboxes = [...wikitext.matchAll(/\{\{\s*infobox past\b([\s\S]*?)^[ \t]*\}\}/gim)]
                 .map(match => {
                     const pastInfobox = match[1];
@@ -1946,11 +1964,12 @@
             const changeClassification = classifyCoasterpediaChange(wikitext, infobox, nameHistory);
             const currentVersionStart = nameHistory.find(item => item.name === currentName)?.from || '';
             return {
-                isRollerCoaster: /\{\{\s*Infobox roller coaster\b/i.test(wikitext),
+                isRollerCoaster: Boolean(infoboxType),
                 hasRideInfobox: /\{\{\s*Infobox ride\b/i.test(wikitext),
                 isWaterCoaster: /\{\{\s*Infobox ride\b/i.test(wikitext) &&
                     /^\|product\s*=.*\bwater coaster\b/im.test(wikitext),
-                tracks: trackCount ? Number(trackCount[1]) : 1,
+                tracks: Math.max(trackCount ? Number(trackCount[1]) : 1, namedTracks.length),
+                trackNames: namedTracks,
                 currentStatus,
                 isCurrentPark: mainParkMatches,
                 hasPastParkRecord: Boolean(pastParkInfobox),

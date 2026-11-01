@@ -52,6 +52,9 @@
             border-color: rgba(var(--active-accent), 0.7) !important;
             box-shadow: 0 10px 24px rgba(var(--active-accent), 0.12);
         }
+        .dashboard-stat-card[data-filter-kind="credits"].is-active {
+            box-shadow: none;
+        }
         #log-list { overflow-anchor: none; }
         #startup-screen.hidden { display: none; }
         @media (max-width: 900px) {
@@ -359,11 +362,11 @@
                         <h2 class="text-lg font-bold text-white flex items-center gap-2">
                             <i class="fa-solid fa-globe text-brand-500"></i> Coasterpedia Coaster Discovery
                         </h2>
-                        <p class="text-xs text-slate-400">Browse parks by operating, not operating, and defunct coasters</p>
+                        <p class="text-xs text-slate-400">Browse parks with roller coasters; water slides and water parks without coasters are excluded</p>
                     </div>
                 </div>
 
-                <p class="text-[11px] text-slate-500">Park coaster lists are provided by <a href="https://coasterpedia.net/" target="_blank" rel="noopener noreferrer" class="text-brand-400 hover:text-brand-300 underline">Coasterpedia</a>. For standalone coasters not listed here, use "Add Custom Entry" in Credits.</p>
+                <p class="text-[11px] text-slate-500">Park coaster lists are provided by <a href="https://coasterpedia.net/" target="_blank" rel="noopener noreferrer" class="text-brand-400 hover:text-brand-300 underline">Coasterpedia</a>. Only entries with a roller coaster article are shown; water slides and water parks without roller coasters are excluded. For standalone coasters not listed here, use "Add Custom Entry" in Credits.</p>
 
                 <div class="relative">
                     <label for="park-search-input" class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Search parks</label>
@@ -380,7 +383,6 @@
                 <div id="rides-results-placeholder" class="text-center py-12">
                     <i class="fa-solid fa-location-dot text-4xl text-slate-600 mb-3 block"></i>
                     <h4 class="text-sm font-semibold text-slate-300">No Park Selected</h4>
-                    <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1">Search for a park above to browse operating, not operating, and defunct coasters.</p>
                 </div>
 
                 <div id="rides-loading" class="hidden text-center py-12">
@@ -431,7 +433,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Park Name</label>
-                        <input type="text" id="form-park-name" oninput="document.getElementById('form-coasterpedia-park-page-id').value = ''" placeholder="e.g. Kings Island" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 read-only:cursor-not-allowed read-only:opacity-70">
+                        <input type="text" id="form-park-name" oninput="document.getElementById('form-coasterpedia-park-page-id').value = ''" placeholder="e.g. Kings Island" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70 disabled:select-none">
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-400 mb-1">Park Name When Ridden</label>
@@ -455,7 +457,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Ride Type *</label>
-                        <select id="form-coaster-type" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <select id="form-coaster-type" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70">
                             <option value="Real">Roller Coaster</option>
                             <option value="Powered">Powered Coaster</option>
                             <option value="Alpine">Alpine Coaster</option>
@@ -464,7 +466,7 @@
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Ride Version / Variation *</label>
-                        <select id="form-variant-type" onchange="markRelogVersionManuallySelected()" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <select id="form-variant-type" onchange="markRelogVersionManuallySelected()" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70">
                             <option value="Original">Original</option>
                             <option value="ElementChange">Reimagined / experience change</option>
                             <option value="Relocated">Relocated</option>
@@ -481,7 +483,7 @@
                 <!-- Date & Counts -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label id="form-date-ridden-label" class="block font-semibold text-slate-300 mb-1">Date Ridden</label>
+                        <label id="form-date-ridden-label" class="block font-semibold text-slate-300 mb-1">First Date Ridden</label>
                         <input type="date" id="form-date-ridden" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                         <label class="mt-2 flex items-center gap-2 text-slate-400">
                             <input type="checkbox" id="form-date-unknown" onchange="toggleUnknownRideDate('date')" class="h-4 w-4 rounded border-bordercolor bg-slate-800 text-brand-600 focus:ring-brand-500">
@@ -489,11 +491,29 @@
                         </label>
                     </div>
                     <div>
-                        <label id="form-time-ridden-label" class="block font-semibold text-slate-300 mb-1">Time Ridden</label>
+                        <label id="form-time-ridden-label" class="block font-semibold text-slate-300 mb-1">First Time Ridden</label>
                         <input type="time" id="form-time-ridden" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                         <label class="mt-2 flex items-center gap-2 text-slate-400">
                             <input type="checkbox" id="form-time-unknown" onchange="toggleUnknownRideDate('time')" class="h-4 w-4 rounded border-bordercolor bg-slate-800 text-brand-600 focus:ring-brand-500">
                             <span>Unknown time</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Most Recent Date Ridden</label>
+                        <input type="date" id="form-most-recent-date-ridden" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <label class="mt-2 flex items-center gap-2 text-slate-400">
+                            <input type="checkbox" id="form-most-recent-date-unknown" onchange="toggleUnknownRideDate('mostRecentDate')" class="h-4 w-4 rounded border-bordercolor bg-slate-800 text-brand-600 focus:ring-brand-500">
+                            <span>Unknown most recent date</span>
+                        </label>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Most Recent Time Ridden</label>
+                        <input type="time" id="form-most-recent-time-ridden" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <label class="mt-2 flex items-center gap-2 text-slate-400">
+                            <input type="checkbox" id="form-most-recent-time-unknown" onchange="toggleUnknownRideDate('mostRecentTime')" class="h-4 w-4 rounded border-bordercolor bg-slate-800 text-brand-600 focus:ring-brand-500">
+                            <span>Unknown most recent time</span>
                         </label>
                     </div>
                 </div>
@@ -584,6 +604,6 @@
     </div>
 
     <script type="module" src="firebase-cloud.js"></script>
-    <script src="app.js?v=coaster-change-classifier-20261021-16" defer></script>
+    <script src="app.js?v=coaster-park-filter-20261101-17" defer></script>
 </body>
 </html>

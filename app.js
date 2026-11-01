@@ -1193,6 +1193,31 @@
             const parkEntries = coasterLog.filter(entry =>
                 (entry.parkName || entry.parkNameRidden || '').trim().toLocaleLowerCase() === parkTitle.toLocaleLowerCase()
             );
+            const hasLaterReimaginedEntry = entry => {
+                if (rideEntryVariant(entry) !== 'Original') return false;
+                const entryReference = coasterpediaRideReference(entry.coasterpediaRideId || '');
+                const entryRideDate = rideDateValue(entry);
+                if (!entryRideDate) return false;
+
+                return parkEntries.some(candidate => {
+                    if (candidate === entry || rideEntryVariant(candidate) !== 'ElementChange' ||
+                        rideDateValue(candidate) <= entryRideDate) {
+                        return false;
+                    }
+
+                    const candidateReference = coasterpediaRideReference(candidate.coasterpediaRideId || '');
+                    const sameTrack = entryReference.trackIdSuffix.toLocaleLowerCase() ===
+                        candidateReference.trackIdSuffix.toLocaleLowerCase();
+                    const sameIdentity = entry.coasterpediaPageId && candidate.coasterpediaPageId
+                        ? entry.coasterpediaPageId === candidate.coasterpediaPageId
+                        : entryReference.pageTitle && candidateReference.pageTitle
+                            ? entryReference.pageTitle.toLocaleLowerCase() ===
+                                candidateReference.pageTitle.toLocaleLowerCase()
+                            : (entry.coasterName || '').toLocaleLowerCase() ===
+                                (candidate.coasterName || '').toLocaleLowerCase();
+                    return sameTrack && sameIdentity;
+                });
+            };
             const titlesToResolve = [
                 ...rides.map(ride => ride.pageTitle || coasterpediaRideReference(ride.sourceRideId || ride.id).pageTitle),
                 ...parkEntries.filter(entry => !entry.coasterpediaPageId && entry.coasterpediaRideId)
@@ -1291,8 +1316,16 @@
                         changed = true;
                     }
                 }
-                if (rideDetails.status && entry.rideStatus !== rideDetails.status) {
-                    entry.rideStatus = rideDetails.status;
+                let updatedStatus = rideDetails.status;
+                if (updatedStatus === 'Operating' && rideEntryVariant(entry) === 'Original') {
+                    if (hasLaterReimaginedEntry(entry)) {
+                        updatedStatus = 'Not operating';
+                    } else if (normalizeCoasterStatus(entry.rideStatus) === 'Not operating') {
+                        updatedStatus = '';
+                    }
+                }
+                if (updatedStatus && entry.rideStatus !== updatedStatus) {
+                    entry.rideStatus = updatedStatus;
                     changed = true;
                 }
                 if (changed) updatedCount++;

@@ -1832,6 +1832,7 @@
                     : details.isCurrentPark && details.changeClassification === 'reimagined'
                         ? 'ElementChange'
                         : 'Original';
+                ride.trackVariants = details.trackVariants;
                 ride.changeYear = details.changeYear;
                 ride.hasReimaginedVersion = false;
                 ride.hasRelocatedHistory = details.hasRelocatedHistory;
@@ -1866,8 +1867,10 @@
                     sourceRideId: `${ride.sourceRideId}::track-${index + 1}`,
                     name: `${ride.name} (${trackName})`,
                     trackName,
+                    variant: ride.trackVariants?.[index] || ride.variant,
                     trackIndex: index + 1,
-                    trackNames: undefined
+                    trackNames: undefined,
+                    trackVariants: undefined
                 }));
             });
         }
@@ -1923,6 +1926,16 @@
                 .sort((first, second) => Number(first[1]) - Number(second[1]))
                 .map(match => cleanCoasterpediaCell(match[2]))
                 .filter(Boolean);
+            const hasBackwardTrackHistory = /\bone of the sides ran backwards\b/i.test(wikitext) &&
+                /\brestored the trains to the original forward direction\b/i.test(wikitext);
+            const isKingsIslandRacer = infoboxName.toLocaleLowerCase() === 'the racer' &&
+                selectedParkName.toLocaleLowerCase() === 'kings island' &&
+                hasBackwardTrackHistory;
+            const trackNames = namedTracks.length
+                ? namedTracks
+                : isKingsIslandRacer
+                    ? ['Red Track', 'Blue Track']
+                    : [];
             const pastInfoboxes = [...wikitext.matchAll(/\{\{\s*infobox past\b([\s\S]*?)^[ \t]*\}\}/gim)]
                 .map(match => {
                     const pastInfobox = match[1];
@@ -1968,8 +1981,9 @@
                 hasRideInfobox: /\{\{\s*Infobox ride\b/i.test(wikitext),
                 isWaterCoaster: /\{\{\s*Infobox ride\b/i.test(wikitext) &&
                     /^\|product\s*=.*\bwater coaster\b/im.test(wikitext),
-                tracks: Math.max(trackCount ? Number(trackCount[1]) : 1, namedTracks.length),
-                trackNames: namedTracks,
+                tracks: Math.max(trackCount ? Number(trackCount[1]) : 1, trackNames.length),
+                trackNames,
+                trackVariants: isKingsIslandRacer ? ['ElementChange', 'Original'] : [],
                 currentStatus,
                 isCurrentPark: mainParkMatches,
                 hasPastParkRecord: Boolean(pastParkInfobox),

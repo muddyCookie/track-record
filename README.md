@@ -4,6 +4,8 @@ A static website for tracking coaster rides and credits. The page layout is in `
 
 Ride status defaults to Operating for new entries. Manual entries can be set to Operating, Not operating, or Defunct; Coasterpedia-sourced statuses are locked, and rides under construction cannot be quick-logged.
 
+Kings Island's The Racer uses Red/Blue track names; the Red side is the former backwards-running side and is automatically logged as Reimagined, while the Blue side remains Original.
+
 ## Test locally
 
 From this folder, start a local web server (Firebase modules require HTTP/HTTPS; opening `index.html` directly as a file will not work):

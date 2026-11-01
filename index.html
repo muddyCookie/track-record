@@ -40,10 +40,75 @@
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        .auth-overlay {
+            display: grid;
+            place-items: center;
+        }
+        .auth-overlay.hidden {
+            display: none;
+        }
         .dashboard-stat-card.is-active {
             background: linear-gradient(135deg, rgba(var(--active-accent), 0.24), rgba(30, 41, 59, 0.94)) !important;
             border-color: rgba(var(--active-accent), 0.7) !important;
             box-shadow: 0 10px 24px rgba(var(--active-accent), 0.12);
+        }
+        #log-list { overflow-anchor: none; }
+        #startup-screen.hidden { display: none; }
+        @media (max-width: 900px) {
+            #log-action-controls {
+                width: 100% !important;
+                flex-wrap: wrap;
+                justify-content: flex-end;
+            }
+        }
+        @media (max-width: 639px) {
+            body { overflow-x: hidden; }
+            header .max-w-7xl,
+            main.max-w-7xl { padding-left: .75rem; padding-right: .75rem; }
+            header .max-w-7xl > .flex { align-items: stretch; gap: .5rem; }
+            header .max-w-7xl > .flex > button:first-child { align-self: flex-start; }
+            header .max-w-7xl > .flex > .flex.flex-wrap.items-center.justify-end {
+                display: grid;
+                width: 100%;
+                grid-template-columns: 1fr 1fr;
+                justify-content: stretch;
+                gap: .5rem;
+            }
+            header #account-action,
+            header button[onclick="openSettingsModal()"] {
+                justify-content: center;
+                padding: .625rem .5rem;
+                border: 1px solid #334155;
+                border-radius: .75rem;
+                background: rgba(15, 23, 42, .55);
+            }
+            header .max-w-7xl > .flex > .flex.flex-wrap.items-center.justify-end > .flex.space-x-1 {
+                grid-column: 1 / -1;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                width: 100%;
+                margin: 0;
+            }
+            header .flex.space-x-1 > button { justify-content: center; margin-left: 0; }
+            main.max-w-7xl { padding-top: 1rem; padding-bottom: 1.5rem; }
+            #tab-log,
+            #tab-search { gap: 1rem; }
+            #tab-log > .flex:first-child { padding: .875rem; }
+            #tab-log > .flex:first-child p { line-height: 1.45; }
+            #dashboard-stats-grid { gap: .5rem; }
+            .dashboard-stat-card { min-height: 5rem; padding: .75rem; border-radius: .875rem; }
+            .dashboard-stat-card > div:first-child { font-size: .625rem; letter-spacing: .06em; }
+            #log-controls-bar { align-items: stretch; padding: .875rem; }
+            #log-controls-bar > div:first-child { flex-wrap: wrap; }
+            #log-action-controls { align-items: stretch; }
+            #log-action-controls select { min-height: 2.5rem; }
+            #log-list > .bg-cardbg { padding: 1.5rem 1rem; }
+            #rides-results-container,
+            #tab-search > .bg-cardbg { padding: 1rem; }
+            #rides-grid .bg-slate-900,
+            #rides-grid [class*="rounded-xl"] { max-width: 100%; }
+            input, select, textarea { font-size: 16px; }
+            #auth-form { padding: 1.25rem; }
         }
     </style>
 </head>
@@ -52,8 +117,27 @@
     <!-- Toast Notification Overlay -->
     <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-    <div id="auth-screen" class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/95 p-4">
-        <form id="auth-form" onsubmit="submitAuthForm(event)" class="w-full max-w-md rounded-2xl border border-bordercolor bg-cardbg p-6 shadow-2xl">
+    <div id="startup-screen" class="fixed inset-0 z-[55] flex items-center justify-center bg-darkbg p-6">
+        <div class="flex flex-col items-center gap-4 text-center">
+            <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-brand-600 to-emerald-400 text-white shadow-lg shadow-brand-500/20">
+                <svg viewBox="0 0 24 24" class="h-9 w-9" fill="none" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9.25" stroke="currentColor" stroke-width="1.5"/>
+                    <circle cx="12" cy="12" r="7.1" stroke="currentColor" stroke-opacity=".65" stroke-width="1"/>
+                    <circle cx="12" cy="12" r="5.25" stroke="currentColor" stroke-opacity=".45" stroke-width=".8"/>
+                    <path d="M3.2 13.9c2.7 0 3.1-4.4 5.8-4.4s3.1 4.2 5.7 4.2 3.1-4.1 6.1-4.1M3.6 15.7c2.5 0 3-4.3 5.4-4.3s3.2 4.1 5.7 4.1 3.2-4 5.7-4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+                    <circle cx="12" cy="12" r="1.15" fill="currentColor"/>
+                </svg>
+            </span>
+            <div>
+                <p class="font-bold text-white">Track Record</p>
+                <p class="mt-1 text-sm text-slate-400">Loading your account…</p>
+            </div>
+            <i class="fa-solid fa-circle-notch fa-spin text-brand-400" aria-hidden="true"></i>
+        </div>
+    </div>
+
+    <div id="auth-screen" class="auth-overlay fixed inset-0 z-[60] hidden bg-slate-950/80 p-4 backdrop-blur-sm" onclick="if (event.target === this) closeAuthDialog()">
+        <form id="auth-form" onsubmit="submitAuthForm(event)" class="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-bordercolor bg-cardbg p-6 shadow-2xl">
             <div class="mb-6 flex items-center gap-3">
                 <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 text-white shadow-md shadow-brand-500/20">
                     <svg viewBox="0 0 24 24" class="h-7 w-7" fill="none" aria-hidden="true">
@@ -67,7 +151,7 @@
                 </span>
                 <div>
                     <h1 class="text-xl font-bold text-white">Track Record</h1>
-                    <p class="text-xs text-slate-400">Sign in to sync your credits</p>
+                    <p class="text-xs text-slate-400">Sign in to access and sync your private credits</p>
                 </div>
             </div>
             <div class="space-y-4">
@@ -82,12 +166,13 @@
                 <p id="auth-error" class="hidden rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300" role="alert"></p>
                 <p id="auth-status" class="hidden rounded-lg border border-brand-500/30 bg-brand-500/10 p-3 text-xs text-brand-200" role="status"></p>
                 <button id="auth-retry" type="button" onclick="retryAccountLoad()" class="hidden w-full rounded-xl border border-bordercolor bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">Retry loading account</button>
-                <button id="auth-signout" type="button" onclick="signOutAccount()" class="hidden w-full text-xs text-slate-400 hover:text-white">Sign out</button>
-                <button id="auth-submit" type="submit" class="w-full rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-500">Sign in</button>
+                <button id="auth-signout" type="button" onclick="signOutAccount()" class="hidden w-full text-xs text-slate-400 hover:text-white">Sign Out</button>
+                <button id="auth-submit" type="submit" class="w-full rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-500">Sign In</button>
                 <div class="flex items-center justify-between text-xs">
-                    <button id="auth-mode-toggle" type="button" onclick="toggleAuthMode()" class="text-brand-300 hover:text-brand-200">Create an account</button>
-                    <button id="auth-reset" type="button" onclick="resetAccountPassword()" class="text-slate-400 hover:text-white">Forgot password?</button>
+                    <button id="auth-mode-toggle" type="button" onclick="toggleAuthMode()" class="text-brand-300 hover:text-brand-200">Create an Account</button>
+                    <button id="auth-reset" type="button" onclick="resetAccountPassword()" class="text-slate-400 hover:text-white">Forgot Password?</button>
                 </div>
+                <button id="continue-as-guest" type="button" onclick="closeAuthDialog()" class="w-full rounded-xl border border-bordercolor px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white">Continue Browsing as Guest</button>
             </div>
         </form>
     </div>
@@ -115,8 +200,8 @@
                 <!-- Navigation Tabs -->
                 <div class="flex flex-wrap items-center justify-end gap-2">
                     <span id="account-email" class="hidden max-w-40 truncate px-2 text-xs text-slate-400 sm:inline"></span>
-                    <button type="button" onclick="signOutAccount()" class="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-slate-400 transition hover:bg-slate-800 hover:text-white" title="Sign out">
-                        <i class="fa-solid fa-arrow-right-from-bracket"></i><span class="hidden sm:inline">Sign out</span>
+                    <button id="account-action" type="button" onclick="handleAccountAction()" class="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-slate-400 transition hover:bg-slate-800 hover:text-white" title="Sign in">
+                        <i id="account-action-icon" class="fa-solid fa-arrow-right-to-bracket"></i><span id="account-action-label">Sign in</span>
                     </button>
                     <button onclick="openSettingsModal()" class="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-150 text-slate-400 hover:text-white hover:bg-slate-800" title="Settings">
                         <i class="fa-solid fa-gear"></i>
@@ -154,7 +239,7 @@
             </div>
 
             <!-- Stats Grid Counters -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+            <div id="dashboard-stats-grid" class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
                 <!-- Roller -->
                 <button type="button" onclick="applyDashboardFilter('type','Real')" data-filter-kind="type" data-filter-value="Real" style="--active-accent: 16, 185, 129" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-emerald-500/50 transition">
                     <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Roller</div>
@@ -184,28 +269,35 @@
                 </button>
 
                 <!-- Duplicates -->
-                <button type="button" onclick="applyDashboardFilter('variants')" data-filter-kind="variants" style="--active-accent: 192, 132, 252" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-purple-500/50 transition">
+                <button type="button" onclick="applyDashboardFilter('duplicates')" data-filter-kind="duplicates" style="--active-accent: 192, 132, 252" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-purple-500/50 transition">
                     <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Duplicates</div>
                     <div id="stat-duplicates" class="text-2xl font-black text-purple-400">0</div>
                     <i class="fa-solid fa-copy absolute -right-2 -bottom-2 text-4xl text-purple-500/10 group-hover:text-purple-500/20 transition"></i>
                 </button>
 
-                <!-- Total Calculated Credits -->
-                <button type="button" onclick="applyDashboardFilter('credits')" data-filter-kind="credits" style="--active-accent: 16, 185, 129" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-brand-300 transition">
-                    <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Total Credits</div>
-                    <div id="stat-total" class="text-3xl font-black text-white">0</div>
-                    <i class="fa-solid fa-trophy absolute -right-2 -bottom-2 text-5xl text-brand-500/20 group-hover:text-brand-500/30 transition"></i>
+                <!-- Relogs -->
+                <button type="button" onclick="applyDashboardFilter('relogs')" data-filter-kind="relogs" style="--active-accent: 244, 114, 182" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-pink-500/50 transition">
+                    <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Relogs</div>
+                    <div id="stat-relogs" class="text-2xl font-black text-pink-400">0</div>
+                    <i class="fa-solid fa-rotate absolute -right-2 -bottom-2 text-4xl text-pink-500/10 group-hover:text-pink-500/20 transition"></i>
                 </button>
 
-                <!-- Parks Visited -->
+                <!-- Parks -->
                 <button type="button" onclick="toggleParkBreakdown()" data-filter-kind="parks" style="--active-accent: 129, 140, 248" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-indigo-500/50 transition">
-                    <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Parks Visited</div>
+                    <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Parks</div>
                     <div id="stat-parks" class="text-2xl font-black text-indigo-400">0</div>
                     <i class="fa-solid fa-map-location-dot absolute -right-2 -bottom-2 text-4xl text-indigo-500/10 group-hover:text-indigo-500/20 transition"></i>
                 </button>
+
+                <!-- Total -->
+                <button type="button" onclick="applyDashboardFilter('credits')" data-filter-kind="credits" style="--active-accent: 16, 185, 129" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-brand-300 transition">
+                    <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Total</div>
+                    <div id="stat-total" class="text-3xl font-black text-white">0</div>
+                    <i class="fa-solid fa-trophy absolute -right-2 -bottom-2 text-5xl text-brand-500/20 group-hover:text-brand-500/30 transition"></i>
+                </button>
             </div>
             <!-- Logbook Header & Search/Filter Controls -->
-            <div class="bg-cardbg rounded-2xl border border-bordercolor p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div id="log-controls-bar" class="bg-cardbg rounded-2xl border border-bordercolor p-4 flex flex-col md:flex-row items-center justify-between gap-4">
                 <div class="w-full md:w-auto flex items-center gap-3">
                     <h3 class="text-base font-bold text-white whitespace-nowrap flex items-center gap-2">
                         <i class="fa-solid fa-list-check text-slate-400"></i> My Coaster Log
@@ -216,7 +308,7 @@
                 </div>
 
                 <!-- Filters -->
-                <div class="w-full md:w-auto flex flex-col sm:flex-row items-center gap-2">
+                <div id="log-action-controls" class="w-full md:w-auto flex flex-col sm:flex-row items-center gap-2">
                     <button onclick="openAddModal()" class="w-full sm:w-auto whitespace-nowrap px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand-600 hover:bg-brand-500 text-white flex items-center justify-center gap-1.5 transition">
                         <i class="fa-solid fa-plus"></i> Add Manual Entry
                     </button>
@@ -267,7 +359,7 @@
                         <h2 class="text-lg font-bold text-white flex items-center gap-2">
                             <i class="fa-solid fa-globe text-brand-500"></i> Coasterpedia Coaster Discovery
                         </h2>
-                        <p class="text-xs text-slate-400">Browse or search all Coasterpedia parks that list present or former coasters</p>
+                        <p class="text-xs text-slate-400">Browse parks by operating, not operating, and defunct coasters</p>
                     </div>
                 </div>
 
@@ -288,7 +380,7 @@
                 <div id="rides-results-placeholder" class="text-center py-12">
                     <i class="fa-solid fa-location-dot text-4xl text-slate-600 mb-3 block"></i>
                     <h4 class="text-sm font-semibold text-slate-300">No Park Selected</h4>
-                    <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1">Search for a park above to browse present and former coasters.</p>
+                    <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1">Search for a park above to browse operating, not operating, and defunct coasters.</p>
                 </div>
 
                 <div id="rides-loading" class="hidden text-center py-12">
@@ -300,7 +392,7 @@
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-bordercolor pb-4">
                         <div>
                             <h3 id="current-park-title" class="text-base font-bold text-white">Park Attractions</h3>
-                            <p id="current-park-sub" class="text-xs text-slate-400">Browse present and former coasters, including earlier names of reimagined rides</p>
+                            <p id="current-park-sub" class="text-xs text-slate-400">Operating, not operating, and defunct coasters listed for this park</p>
                         </div>
                         <input type="text" id="ride-search-filter" oninput="filterRidesList()" placeholder="Filter rides in this park..." class="bg-slate-900 border border-bordercolor rounded-xl px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500 w-full sm:w-64">
                     </div>
@@ -328,16 +420,21 @@
 
             <form id="entry-form" onsubmit="saveEntry(event)" class="p-6 overflow-y-auto space-y-4 text-xs">
                 <input type="hidden" id="form-entry-id">
+                <input type="hidden" id="form-coasterpedia-ride-id">
+                <input type="hidden" id="form-coasterpedia-page-id">
+                <input type="hidden" id="form-coasterpedia-park-page-id">
+                <input type="hidden" id="form-coasterpedia-opening-date">
+                <input type="hidden" id="form-coasterpedia-closing-date">
                 <input type="hidden" id="form-ride-status" value="Unknown">
 
                 <!-- Park Names Row -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="block font-semibold text-slate-300 mb-1">Park Name <span class="text-slate-500 font-normal">(Optional for standalone rides)</span></label>
-                        <input type="text" id="form-park-name" placeholder="e.g. Kings Island (leave blank for a standalone ride)" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <label class="block font-semibold text-slate-300 mb-1">Park Name <span class="text-slate-500 font-normal">(optional for standalone rides)</span></label>
+                        <input type="text" id="form-park-name" oninput="document.getElementById('form-coasterpedia-park-page-id').value = ''" placeholder="e.g. Kings Island" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-400 mb-1">Park Name WHEN RIDDEN <span class="text-slate-500 font-normal">(Historic)</span></label>
+                        <label class="block font-semibold text-slate-400 mb-1">Park Name When Ridden</label>
                         <input type="text" id="form-park-ridden" placeholder="e.g. Paramount's Kings Island" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                     </div>
                 </div>
@@ -346,11 +443,11 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Official Coaster Name *</label>
-                        <input type="text" id="form-coaster-name" required placeholder="e.g. Top Thrill 2" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <input type="text" id="form-coaster-name" oninput="updateRelogNameVariant()" placeholder="e.g. Queen City Stunt Coaster" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70">
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-400 mb-1">Coaster Name WHEN RIDDEN <span class="text-slate-500 font-normal">(Historic)</span></label>
-                        <input type="text" id="form-coaster-ridden" placeholder="e.g. Top Thrill Dragster" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <label class="block font-semibold text-slate-300 mb-1">Coaster Name When Ridden</label>
+                        <input type="text" id="form-coaster-ridden" placeholder="e.g. Backlot Stunt Coaster" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                     </div>
                 </div>
 
@@ -367,13 +464,17 @@
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Ride Version / Variation *</label>
-                        <select id="form-variant-type" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <select id="form-variant-type" onchange="markRelogVersionManuallySelected()" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                             <option value="Original">Original</option>
-                            <option value="ExperienceChange">Same Track, Different Experience</option>
-                            <option value="ElementChange">Track / Element Change</option>
+                            <option value="ElementChange">Reimagined / experience change</option>
                             <option value="Relocated">Relocated</option>
                         </select>
-                        <p class="mt-1 text-[10px] text-slate-500">Present/former status follows Coasterpedia's current park list. For a relocated ride with changed track or elements, choose Track / Element Change.</p>
+                    </div>
+                    <div id="form-duplicate-row" class="hidden sm:col-start-2">
+                        <label class="inline-flex items-center gap-2 text-slate-400 cursor-pointer">
+                            <input type="checkbox" id="form-is-duplicate" class="h-4 w-4 rounded border-bordercolor bg-slate-800 text-violet-500 focus:ring-violet-500">
+                            <span class="font-semibold">Duplicate</span>
+                        </label>
                     </div>
                 </div>
 
@@ -382,10 +483,18 @@
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Date Ridden</label>
                         <input type="date" id="form-date-ridden" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <label class="mt-2 flex items-center gap-2 text-slate-400">
+                            <input type="checkbox" id="form-date-unknown" onchange="toggleUnknownRideDate('date')" class="h-4 w-4 rounded border-bordercolor bg-slate-800 text-brand-600 focus:ring-brand-500">
+                            <span>Unknown date</span>
+                        </label>
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Time Ridden</label>
                         <input type="time" id="form-time-ridden" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <label class="mt-2 flex items-center gap-2 text-slate-400">
+                            <input type="checkbox" id="form-time-unknown" onchange="toggleUnknownRideDate('time')" class="h-4 w-4 rounded border-bordercolor bg-slate-800 text-brand-600 focus:ring-brand-500">
+                            <span>Unknown time</span>
+                        </label>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -394,7 +503,6 @@
                         <input type="number" id="form-ride-count" min="1" value="1" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                     </div>
                 </div>
-
                 <!-- Notes Field -->
                 <div>
                     <label class="block font-semibold text-slate-300 mb-1">Notes / Experience Details</label>
@@ -404,7 +512,7 @@
                 <!-- Submit Buttons -->
                 <div class="pt-2 flex justify-end gap-2 border-t border-bordercolor">
                     <button type="button" onclick="closeEntryModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold transition">Cancel</button>
-                    <button type="submit" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-semibold shadow-md shadow-brand-600/20 transition">Save Ride Entry</button>
+                    <button id="form-entry-submit" type="submit" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-semibold shadow-md shadow-brand-600/20 transition">Save Ride Entry</button>
                 </div>
             </form>
         </div>
@@ -422,38 +530,39 @@
 
             <div class="p-6 space-y-3 text-xs overflow-y-auto">
                 <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Credit Calculation Rules</h4>
-                <p class="text-slate-400 mb-2">Choose which ride types and versions count toward Total Credits. These settings change the total, not which entries appear in your log.</p>
+                <p class="text-slate-400 mb-2">Choose which ride types and versions count toward Total. These settings change the total, not which entries appear in your log.</p>
 
                 <h4 class="pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Ride types</h4>
-                <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
-                    <span class="font-medium text-slate-200">Count powered coasters</span>
-                    <input type="checkbox" id="rule-powered" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
+                <label class="flex items-center justify-between gap-4 p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
+                    <span><span class="font-medium text-slate-200">Count powered coasters</span><span class="mt-1 block text-[10px] text-slate-500">Motor-driven rides, such as Thunder Run.</span></span>
+                    <input type="checkbox" id="rule-powered" onchange="saveRules()" class="w-4 h-4 shrink-0 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
                 </label>
 
-                <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
-                    <span class="font-medium text-slate-200">Count alpine coasters</span>
-                    <input type="checkbox" id="rule-alpine" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
+                <label class="flex items-center justify-between gap-4 p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
+                    <span><span class="font-medium text-slate-200">Count alpine coasters</span><span class="mt-1 block text-[10px] text-slate-500">Mountain coaster rides, such as Georgia Mountain Coaster.</span></span>
+                    <input type="checkbox" id="rule-alpine" onchange="saveRules()" class="w-4 h-4 shrink-0 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
                 </label>
 
-                <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
-                    <span class="font-medium text-slate-200">Count water coasters</span>
-                    <input type="checkbox" id="rule-water" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
+                <label class="flex items-center justify-between gap-4 p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
+                    <span><span class="font-medium text-slate-200">Count water coasters</span><span class="mt-1 block text-[10px] text-slate-500">Rides classified as water coasters, such as NightFlight Expedition.</span></span>
+                    <input type="checkbox" id="rule-water" onchange="saveRules()" class="w-4 h-4 shrink-0 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
                 </label>
 
                 <h4 class="pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Ride versions and changes</h4>
-                <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
-                    <span class="font-medium text-slate-200">Count same-track experience changes (VR, enclosure)</span>
-                    <input type="checkbox" id="rule-experience-change" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
+                <label class="flex items-center justify-between gap-4 p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
+                    <span><span class="font-medium text-slate-200">Count reimagined / experience changes</span><span class="mt-1 block text-[10px] text-slate-500">Counts experience changes such as: Enclosing a ride (Avalanche Run → Disaster Transport), adding virtual reality (Iron Dragon VR), Stand-Up to Floorless (Apocalypse → Firebird), or wood to steel track (Predator). Not a rename/theme-only update (Intimidator 305 → Pantherian) or an ordinary same-material retracking.</span></span>
+                    <input type="checkbox" id="rule-element-change" onchange="saveRules()" class="w-4 h-4 shrink-0 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
                 </label>
 
-                <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
-                    <span class="font-medium text-slate-200">Count track / element changes (rebuild, launch, elements)</span>
-                    <input type="checkbox" id="rule-element-change" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
+                <label class="flex items-center justify-between gap-4 p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
+                    <span><span class="font-medium text-slate-200">Count relocated coasters</span><span class="mt-1 block text-[10px] text-slate-500">There were no changes to the ride itself, only its location, theme or name (Ragin' Cajun → Barrels O' Fun).</span></span>
+                    <input type="checkbox" id="rule-relocated" onchange="saveRules()" class="w-4 h-4 shrink-0 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
                 </label>
 
-                <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
-                    <span class="font-medium text-slate-200">Count relocated coasters (no track / element changes)</span>
-                    <input type="checkbox" id="rule-relocated" onchange="saveRules()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
+                <h4 class="pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Repeat rides</h4>
+                <label class="flex items-center justify-between gap-4 p-3 rounded-xl bg-slate-900 border border-bordercolor cursor-pointer hover:bg-slate-850">
+                    <span><span class="font-medium text-slate-200">Count relogs</span><span class="mt-1 block text-[10px] text-slate-500">When on, each recorded lap adds to the total. For example, logging three laps adds three logs instead of only one. When off, each coaster counts once even if you log multiple laps.</span></span>
+                    <input type="checkbox" id="rule-count-relogs" onchange="saveRules()" class="w-4 h-4 shrink-0 rounded text-brand-600 focus:ring-brand-500 bg-slate-800 border-bordercolor">
                 </label>
 
                 <h4 class="pt-4 text-[11px] font-bold uppercase tracking-wider text-slate-500">Data</h4>
@@ -461,7 +570,7 @@
                     <button type="button" onclick="exportData('json')" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-bordercolor flex items-center gap-2 transition">
                         <i class="fa-solid fa-file-export"></i> Export JSON Backup
                     </button>
-                    <button type="button" onclick="document.getElementById('import-file-input').click()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-bordercolor flex items-center gap-2 transition">
+                    <button type="button" onclick="requestImportData()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-bordercolor flex items-center gap-2 transition">
                         <i class="fa-solid fa-file-import"></i> Import JSON or CSV
                     </button>
                     <input type="file" id="import-file-input" class="hidden" accept=".json,.csv" onchange="importData(event)">
@@ -475,6 +584,6 @@
     </div>
 
     <script type="module" src="firebase-cloud.js"></script>
-    <script src="app.js" defer></script>
+    <script src="app.js?v=coaster-change-classifier-20261021-16" defer></script>
 </body>
 </html>

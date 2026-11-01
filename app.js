@@ -674,7 +674,7 @@
                     .filter(Boolean)
                     .join('–');
 
-                const parkDisplayName = entry.parkName || 'Standalone ride';
+                const parkDisplayName = entry.parkName || 'Standalone';
                 const historicParkName = entry.parkNameRidden && entry.parkNameRidden !== entry.parkName
                     ? entry.parkNameRidden
                     : '';

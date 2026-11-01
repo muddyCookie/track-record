@@ -443,7 +443,7 @@
                 <!-- Coaster Names Row -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="block font-semibold text-slate-300 mb-1">Official Coaster Name *</label>
+                        <label class="block font-semibold text-slate-300 mb-1">Coaster Name *</label>
                         <input type="text" id="form-coaster-name" placeholder="e.g. Queen City Stunt Coaster" required class="select-none w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70">
                     </div>
                     <div>
@@ -452,10 +452,10 @@
                     </div>
                 </div>
 
-                <!-- Classification Row -->
+                <!-- Type and Status Row -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="block font-semibold text-slate-300 mb-1">Ride Type *</label>
+                        <label class="block font-semibold text-slate-300 mb-1">Type *</label>
                         <select id="form-coaster-type" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70">
                             <option value="Real">Roller Coaster</option>
                             <option value="Powered">Powered Coaster</option>
@@ -464,27 +464,38 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-300 mb-1">Ride Version / Variation *</label>
-                        <select id="form-variant-type" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
-                            <option value="Original">Original</option>
-                            <option value="ElementChange">Reimagined / experience change</option>
-                            <option value="Relocated">Relocated</option>
+                        <label class="block font-semibold text-slate-300 mb-1">Status</label>
+                        <select id="form-ride-status" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70">
+                            <option value="Operating" selected>Operating</option>
+                            <option value="Not operating">Not operating</option>
+                            <option value="Defunct">Defunct</option>
                         </select>
-                    </div>
-                    <div id="form-duplicate-row" class="hidden sm:col-start-2">
-                        <label class="inline-flex items-center gap-2 text-slate-400 cursor-pointer">
-                            <input type="checkbox" id="form-is-duplicate" class="h-4 w-4 rounded border-bordercolor bg-slate-800 text-violet-500 focus:ring-violet-500">
-                            <span class="font-semibold">Duplicate</span>
-                        </label>
                     </div>
                 </div>
 
-                <!-- Date & Counts -->
-                <div>
-                    <label for="form-manual-operating-dates" class="block font-semibold text-slate-300 mb-1">Coaster Operating Dates (optional)</label>
-                    <input type="text" id="form-manual-operating-dates" placeholder="e.g. 2007-2020" aria-describedby="form-manual-operating-dates-help" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
-                    <p id="form-manual-operating-dates-help" class="mt-1 text-slate-500">Enter a year or range, such as 2007-2020. Leave blank to use sourced dates.</p>
+                <!-- Operated Dates and Variation -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="form-manual-operating-dates" class="block font-semibold text-slate-300 mb-1">Operated Dates</label>
+                        <input type="text" id="form-manual-operating-dates" placeholder="e.g. 2007-2020" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Variation *</label>
+                        <select id="form-variant-type" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                            <option value="Original">Original</option>
+                            <option value="ElementChange">Reimagined</option>
+                            <option value="Relocated">Relocated</option>
+                        </select>
+                        <div id="form-duplicate-row" class="hidden mt-2">
+                            <label class="inline-flex items-center gap-2 text-slate-400 cursor-pointer">
+                                <input type="checkbox" id="form-is-duplicate" class="h-4 w-4 rounded border-bordercolor bg-slate-800 text-violet-500 focus:ring-violet-500">
+                                <span class="font-semibold">Duplicate</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- First-Ridden Date and Time -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label id="form-date-ridden-label" class="block font-semibold text-slate-300 mb-1">Date First Ridden</label>
@@ -503,24 +514,16 @@
                         </label>
                     </div>
                 </div>
+                <!-- Laps and Notes -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="block font-semibold text-slate-300 mb-1">Ride Count / Laps</label>
+                        <label class="block font-semibold text-slate-300 mb-1">Laps</label>
                         <input type="number" id="form-ride-count" min="1" value="1" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-300 mb-1">Ride Status</label>
-                        <select id="form-ride-status" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70">
-                            <option value="Operating" selected>Operating</option>
-                            <option value="Not operating">Not operating</option>
-                            <option value="Defunct">Defunct</option>
-                        </select>
+                        <label class="block font-semibold text-slate-300 mb-1">Notes</label>
+                        <textarea id="form-notes" rows="2" placeholder="e.g. Front row night ride, launch felt intense!" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 resize-none"></textarea>
                     </div>
-                </div>
-                <!-- Notes Field -->
-                <div>
-                    <label class="block font-semibold text-slate-300 mb-1">Notes / Experience Details</label>
-                    <textarea id="form-notes" rows="2" placeholder="e.g. Front row night ride, launch felt intense!" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 resize-none"></textarea>
                 </div>
 
                 <!-- Submit Buttons -->

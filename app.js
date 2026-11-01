@@ -2150,10 +2150,10 @@
                     changeEvidence.find(item => item.type === 'structural')?.text ||
                     '',
                 changeYear: changeClassification === 'reimagined'
-                    ? currentVersionStart.match(/\b(?:18|19|20)\d{2}\b/)?.[0] ||
+                    ? (isUpdatedVersion ? formatCoasterpediaYear(openingDate) : '') ||
+                        currentVersionStart.match(/\b(?:18|19|20)\d{2}\b/)?.[0] ||
                         (changeEvidence.find(item => ['major', 'track', 'structural'].includes(item.type))?.text || '')
                             .match(/\b(?:18|19|20)\d{2}\b/)?.[0] ||
-                        (isUpdatedVersion ? formatCoasterpediaYear(openingDate) : '') ||
                         ''
                     : '',
                 hasReimaginedVersion: changeClassification === 'reimagined' && nameHistory.length < 2,

@@ -17,10 +17,6 @@
         let parkValidationAbortController = null;
         let activeDashboardFilter = null;
         let currentUser = null;
-        let relogSourceEntryId = '';
-        let relogInitialCoasterName = '';
-        let relogInitialVariant = 'Original';
-        let relogVersionManuallySelected = false;
         let authMode = 'signin';
         let authLoadRequestId = 0;
         let authStateSubscription = null;
@@ -684,14 +680,13 @@
                     : '';
 
                 const rideDateTime = formatRideDateTime(entry);
-                const mostRecentRideDateTime = entry.mostRecentDateRidden || entry.mostRecentTimeRidden ||
-                        entry.mostRecentUnknownDate || entry.mostRecentUnknownTime || group.rideCount > 1
+                const mostRecentRideDateTime = group.rideCount > 1
                     ? formatRideDateTime({
-                            dateRidden: entry.mostRecentDateRidden || entry.dateRidden,
-                            timeRidden: entry.mostRecentTimeRidden || entry.timeRidden,
-                        unknownDate: entry.mostRecentUnknownDate,
-                        unknownTime: entry.mostRecentUnknownTime,
-                            loggedAt: entry.mostRecentLoggedAt || entry.loggedAt
+                        dateRidden: entry.mostRecentDateRidden || entry.dateRidden,
+                        timeRidden: entry.mostRecentTimeRidden || entry.timeRidden,
+                        unknownDate: entry.mostRecentDateRidden ? false : entry.unknownDate,
+                        unknownTime: entry.mostRecentTimeRidden ? false : entry.unknownTime,
+                        loggedAt: entry.mostRecentLoggedAt || entry.loggedAt
                     })
                     : '';
                 const rideStatus = normalizeCoasterStatus(entry.rideStatus || 'Status unknown');
@@ -700,7 +695,7 @@
                     <div class="bg-cardbg rounded-2xl border border-bordercolor p-4 hover:border-slate-700 transition flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                         <div class="space-y-1.5 flex-grow">
                             <div class="flex items-center gap-2 flex-wrap">
-                                <h4 class="text-base font-bold text-white">${escapeHtml(entry.coasterName)}</h4>
+                                <h4 class="select-none text-base font-bold text-white">${escapeHtml(entry.coasterName)}</h4>
                                 ${isDuplicate ? '<span class="rounded-md border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold text-violet-300">Duplicate</span>' : ''}
                             </div>
                             ${entry.coasterNameRidden && entry.coasterNameRidden !== entry.coasterName
@@ -726,7 +721,7 @@
                             <button onclick="openEditModal('${entry.id}')" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-bordercolor text-xs transition flex items-center gap-1.5" title="Edit Entry" aria-label="Edit ${escapeHtml(entry.coasterName)}">
                                 <i class="fa-solid fa-pen"></i><span>Edit</span>
                             </button>
-                            <button type="button" onclick="relogEntry('${entry.id}')" class="px-3 py-2 rounded-xl bg-brand-600/10 hover:bg-brand-600/20 text-brand-300 border border-brand-500/20 text-xs transition flex items-center gap-1.5" title="Edit and save a relog">
+                            <button type="button" onclick="relogEntry('${entry.id}')" class="px-3 py-2 rounded-xl bg-brand-600/10 hover:bg-brand-600/20 text-brand-300 border border-brand-500/20 text-xs transition flex items-center gap-1.5" title="Add one lap and update the most recent ridden date/time">
                                 <i class="fa-solid fa-rotate"></i><span>Relog</span>
                             </button>
                             <button type="button" onclick="deleteEntry('${entry.id}')" class="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs transition" title="Delete Entry" aria-label="Delete ${escapeHtml(entry.coasterName)} log entry">
@@ -932,7 +927,14 @@
         }
 
         function normalizeCoasterStatus(status = 'Unknown') {
-            const value = String(status || 'Unknown').trim();
+            const value = String(status || 'Unknown')
+                .replace(/\{\{\s*([^|{}]+)(?:\|[^{}]*)?\}\}/g, '$1')
+                .replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g, '$2')
+                .replace(/\[\[([^\]]+)\]\]/g, '$1')
+                .replace(/<[^>]*>/g, ' ')
+                .replace(/[_\s]+/g, ' ')
+                .replace(/[.;:,]+$/g, '')
+                .trim();
             if (/^under construction$/i.test(value)) return 'Under construction';
             if (/^(?:present|current|operating)$/i.test(value)) return 'Operating';
             if (/^(?:former|past|defunct)$/i.test(value)) return 'Defunct';
@@ -1026,7 +1028,7 @@
                     showToast(`Updated name or status for ${updatedRideDetails} logged coaster${updatedRideDetails === 1 ? '' : 's'}.`, 'success');
                 }
 
-                document.getElementById('current-park-title').innerText = `${selectedPage.title} Coasters`;
+                document.getElementById('current-park-title').innerText = selectedPage.title;
                 renderRidesList();
 
                 containerLoading.classList.add('hidden');
@@ -2156,7 +2158,7 @@
                         <div class="flex flex-col gap-2 px-4 py-3 transition hover:bg-slate-800/40 sm:flex-row sm:items-center sm:justify-between">
                             <div class="min-w-0">
                                 <div class="flex min-w-0 items-center gap-2 flex-wrap">
-                                    <a href="${articleUrl}" target="_blank" rel="noopener noreferrer" title="View coaster details on Coasterpedia" class="truncate text-sm font-semibold text-slate-100 underline decoration-dotted underline-offset-4 hover:text-brand-400 hover:decoration-solid">${escapeHtml(displayedRideName)} <i aria-hidden="true" class="fa-solid fa-arrow-up-right-from-square ml-1 text-[10px] text-slate-500"></i></a>
+                                    <a href="${articleUrl}" target="_blank" rel="noopener noreferrer" title="View coaster details on Coasterpedia" class="select-none truncate text-sm font-semibold text-slate-100 no-underline hover:text-brand-400">${escapeHtml(displayedRideName)} <i aria-hidden="true" class="fa-solid fa-arrow-up-right-from-square ml-1 text-[10px] text-slate-500"></i></a>
                                     <span class="rounded-md border border-brand-500/20 bg-brand-500/10 px-2 py-0.5 text-[10px] font-semibold text-brand-300">${escapeHtml(rideType)}</span>
                                     ${variant === 'Relocated'
                                         ? `<span class="rounded-md border border-amber-500/20 bg-amber-500/10 text-amber-300 px-2 py-0.5 text-[10px] font-semibold">${escapeHtml(rideVariantLabel(variant))}</span>`
@@ -2169,7 +2171,7 @@
                             </div>
                             ${loggedEntry
                                 ? `<div class="flex gap-2 self-end sm:self-auto">
-                                    <button data-entry-id="${escapeHtml(loggedEntry.id)}" data-current-name="${escapeHtml(displayedRideName)}" data-status="${rideStatus}" data-ride-type="${ride.type || 'Real'}" data-variant="${variant}" data-ride-id="${escapeHtml(rideSourceId)}" data-opening-date="${escapeHtml(disambiguatingOpeningDate)}" data-closing-date="${escapeHtml(disambiguatingClosingDate)}" onclick="relogEntry(this.dataset.entryId, {name: this.dataset.currentName, status: this.dataset.status, type: this.dataset.rideType, variant: this.dataset.variant, rideId: this.dataset.rideId, openingDate: this.dataset.openingDate, closingDate: this.dataset.closingDate})" class="rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-1.5 text-[11px] font-semibold text-brand-300 transition hover:bg-brand-500/20"><i class="fa-solid fa-rotate mr-1"></i>Relog</button>
+                                    <button data-entry-id="${escapeHtml(loggedEntry.id)}" onclick="relogEntry(this.dataset.entryId)" class="rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-1.5 text-[11px] font-semibold text-brand-300 transition hover:bg-brand-500/20" title="Add one lap and update the most recent ridden date/time"><i class="fa-solid fa-rotate mr-1"></i>Relog</button>
                                     <button data-entry-id="${escapeHtml(loggedEntry.id)}" data-current-name="${escapeHtml(displayedRideName)}" onclick="openRideEntryEdit(this.dataset.entryId, this.dataset.currentName)" class="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[11px] font-semibold text-rose-300 transition hover:bg-rose-500/20"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
                                     <button data-entry-id="${escapeHtml(loggedEntry.id)}" onclick="deleteEntry(this.dataset.entryId)" class="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300 transition hover:bg-rose-500/20" title="Delete log entry" aria-label="Delete ${escapeHtml(displayedRideName)} log entry"><i class="fa-solid fa-trash"></i></button>
                                 </div>`
@@ -2272,8 +2274,13 @@
             });
             nameInput.disabled = Boolean(ride || document.getElementById('form-coasterpedia-ride-id').value);
             const classificationLocked = Boolean(ride || document.getElementById('form-coasterpedia-ride-id').value);
-            document.getElementById('form-coaster-type').disabled = classificationLocked;
-            document.getElementById('form-variant-type').disabled = classificationLocked;
+            const rideTypeSelect = document.getElementById('form-coaster-type');
+            const rideTypeDisplay = document.getElementById('form-coaster-type-locked');
+            rideTypeSelect.disabled = classificationLocked;
+            rideTypeSelect.classList.toggle('hidden', classificationLocked);
+            rideTypeDisplay.classList.toggle('hidden', !classificationLocked);
+            rideTypeDisplay.textContent = rideTypeSelect.selectedOptions[0]?.textContent || '';
+            document.getElementById('form-variant-type').disabled = false;
         }
 
         function selectOfficialCoasterName(name = '') {
@@ -2290,17 +2297,12 @@
             if (!option) return;
             document.getElementById('form-coaster-type').value = option.type;
             document.getElementById('form-variant-type').value = option.variant;
-            markRelogVersionManuallySelected();
         }
 
         // Modal Handlers & Form Actions
         function openAddModal() {
             if (!requireSignedIn()) return false;
-            relogSourceEntryId = '';
-            relogInitialCoasterName = '';
-            relogVersionManuallySelected = false;
             document.getElementById('form-duplicate-row').classList.remove('hidden');
-            setRideNameVersionOptions();
             document.getElementById('modal-entry-title').innerHTML = `<i class="fa-solid fa-pen-to-square text-brand-500"></i> Add Log Entry`;
             document.getElementById('form-entry-submit').textContent = 'Save Ride Entry';
             document.getElementById('form-entry-id').value = '';
@@ -2322,29 +2324,21 @@
             const now = new Date();
             document.getElementById('form-date-ridden').value = formatLocalDate(now);
             document.getElementById('form-time-ridden').value = formatLocalTime(now);
-            document.getElementById('form-most-recent-date-ridden').value = formatLocalDate(now);
-            document.getElementById('form-most-recent-time-ridden').value = formatLocalTime(now);
             document.getElementById('form-date-unknown').checked = false;
             document.getElementById('form-time-unknown').checked = false;
-            document.getElementById('form-most-recent-date-unknown').checked = false;
-            document.getElementById('form-most-recent-time-unknown').checked = false;
             toggleUnknownRideDate('date');
             toggleUnknownRideDate('time');
-            toggleUnknownRideDate('mostRecentDate');
-            toggleUnknownRideDate('mostRecentTime');
             document.getElementById('form-ride-status').value = 'Unknown';
             document.getElementById('form-ride-count').value = 1;
             document.getElementById('form-is-duplicate').checked = false;
             document.getElementById('form-notes').value = '';
+            setRideNameVersionOptions();
             document.getElementById('modal-entry').classList.remove('hidden');
             return true;
         }
 
         function openEditModal(id) {
             if (!requireSignedIn()) return false;
-            relogSourceEntryId = '';
-            relogInitialCoasterName = '';
-            relogVersionManuallySelected = false;
             document.getElementById('form-duplicate-row').classList.remove('hidden');
             const group = getCoasterLogGroups().find(item => item.entries.some(entry => entry.id === id));
             const entry = group?.entry;
@@ -2370,20 +2364,10 @@
             document.getElementById('form-variant-type').value = rideEntryVariant(entry);
             document.getElementById('form-date-ridden').value = entry.dateRidden || '';
             document.getElementById('form-time-ridden').value = entry.timeRidden || '';
-            document.getElementById('form-most-recent-date-ridden').value =
-                entry.mostRecentDateRidden || entry.dateRidden || '';
-            document.getElementById('form-most-recent-time-ridden').value =
-                entry.mostRecentTimeRidden || entry.timeRidden || '';
             document.getElementById('form-date-unknown').checked = entry.unknownDate === true;
             document.getElementById('form-time-unknown').checked = entry.unknownTime === true;
-            document.getElementById('form-most-recent-date-unknown').checked =
-                entry.mostRecentUnknownDate === true || (!entry.mostRecentDateRidden && entry.unknownDate === true);
-            document.getElementById('form-most-recent-time-unknown').checked =
-                entry.mostRecentUnknownTime === true || (!entry.mostRecentTimeRidden && entry.unknownTime === true);
             toggleUnknownRideDate('date');
             toggleUnknownRideDate('time');
-            toggleUnknownRideDate('mostRecentDate');
-            toggleUnknownRideDate('mostRecentTime');
             document.getElementById('form-ride-status').value = normalizeCoasterStatus(entry.rideStatus || 'Unknown');
             document.getElementById('form-ride-count').value = group.rideCount;
             document.getElementById('form-is-duplicate').checked =
@@ -2407,73 +2391,30 @@
             return true;
         }
 
-        function relogEntry(id, rideDetails = null) {
+        function relogEntry(id) {
             if (!requireSignedIn()) return;
             const group = getCoasterLogGroups().find(item => item.entries.some(entry => entry.id === id));
-            if (!group || !openEditModal(id)) return;
-
-            relogSourceEntryId = id;
+            if (!group) {
+                showToast('The coaster log entry could not be found. Please refresh and try again.', 'error');
+                return;
+            }
             const now = new Date();
-            if (rideDetails) {
-                const ride = currentParkRides.find(item =>
-                    (item.sourceRideId || item.id) === rideDetails.rideId
-                );
-                document.getElementById('form-coasterpedia-page-id').value =
-                    ride?.coasterpediaPageId || group.entry.coasterpediaPageId || '';
-                const editedParkName = document.getElementById('form-park-name').value.trim();
-                const selectedParkPageId = editedParkName.toLocaleLowerCase() === currentParkTitle.toLocaleLowerCase()
-                    ? currentParkPageId
-                    : '';
-                document.getElementById('form-coasterpedia-park-page-id').value =
-                    group.entry.coasterpediaParkPageId || selectedParkPageId;
-                document.getElementById('form-park-name').disabled =
-                    Boolean(document.getElementById('form-coasterpedia-park-page-id').value);
-                setRideNameVersionOptions(
-                    ride,
-                    rideDetails.name,
-                    rideDetails.type,
-                    rideDetails.variant
-                );
-                selectOfficialCoasterName(rideDetails.name);
-                document.getElementById('form-ride-status').value = rideDetails.status;
-                document.getElementById('form-coaster-type').value = rideDetails.type;
-                document.getElementById('form-variant-type').value = normalizeRideVariant(rideDetails.variant);
-                document.getElementById('form-coasterpedia-ride-id').value =
-                    rideDetails.rideId || group.entry.coasterpediaRideId || '';
-                document.getElementById('form-coasterpedia-opening-date').value =
-                    rideDetails.openingDate || group.entry.coasterpediaOpeningDate || '';
-                document.getElementById('form-coasterpedia-closing-date').value =
-                    rideDetails.closingDate || group.entry.coasterpediaClosingDate || '';
-            }
-            document.getElementById('modal-entry-title').innerHTML = `<i class="fa-solid fa-rotate text-brand-500"></i> Relog Ride Entry`;
-            document.getElementById('form-entry-submit').textContent = 'Save Relog';
-            document.getElementById('form-most-recent-date-ridden').value = formatLocalDate(now);
-            document.getElementById('form-most-recent-time-ridden').value = formatLocalTime(now);
-            document.getElementById('form-most-recent-date-unknown').checked = false;
-            document.getElementById('form-most-recent-time-unknown').checked = false;
-            toggleUnknownRideDate('mostRecentDate');
-            toggleUnknownRideDate('mostRecentTime');
-            document.getElementById('form-ride-count').value = group.rideCount;
-            relogInitialCoasterName = document.getElementById('form-coaster-name').value;
-            relogInitialVariant = document.getElementById('form-variant-type').value;
-            relogVersionManuallySelected = false;
-        }
-
-        function updateRelogNameVariant() {
-            if (!relogSourceEntryId || relogVersionManuallySelected) return;
-            const currentName = document.getElementById('form-coaster-name').value.trim();
-            const versionInput = document.getElementById('form-variant-type');
-            if (currentName === relogInitialCoasterName) {
-                versionInput.value = relogInitialVariant;
-            } else if (rideNameVersionOptions.has(currentName.toLocaleLowerCase())) {
-                versionInput.value = rideNameVersionOptions.get(currentName.toLocaleLowerCase()).variant;
-            } else if (versionInput.value === 'ElementChange') {
-                versionInput.value = 'Original';
-            }
-        }
-
-        function markRelogVersionManuallySelected() {
-            if (relogSourceEntryId) relogVersionManuallySelected = true;
+            const reloggedEntry = {
+                ...group.entry,
+                rideCount: group.rideCount + 1,
+                mostRecentDateRidden: formatLocalDate(now),
+                mostRecentTimeRidden: formatLocalTime(now),
+                mostRecentLoggedAt: now.toISOString()
+            };
+            const groupIds = new Set(group.entries.map(item => item.id));
+            coasterLog = coasterLog.filter(item => !groupIds.has(item.id));
+            coasterLog.unshift(reloggedEntry);
+            saveToLocalStorage();
+            updateStatsAndCounters();
+            renderLogbook();
+            if (!document.getElementById('park-breakdown').classList.contains('hidden')) renderParkBreakdown();
+            refreshVisibleSearchResults();
+            showToast('Coaster relogged', 'success');
         }
 
         function formatLocalDate(date) {
@@ -2514,18 +2455,12 @@
 
         function closeEntryModal() {
             document.getElementById('modal-entry').classList.add('hidden');
-            relogSourceEntryId = '';
-            relogInitialCoasterName = '';
-            relogInitialVariant = 'Original';
-            relogVersionManuallySelected = false;
         }
 
         function toggleUnknownRideDate(field) {
             const fields = {
                 date: ['form-date-unknown', 'form-date-ridden'],
-                time: ['form-time-unknown', 'form-time-ridden'],
-                mostRecentDate: ['form-most-recent-date-unknown', 'form-most-recent-date-ridden'],
-                mostRecentTime: ['form-most-recent-time-unknown', 'form-most-recent-time-ridden']
+                time: ['form-time-unknown', 'form-time-ridden']
             };
             const [checkboxId, inputId] = fields[field];
             const checkbox = document.getElementById(checkboxId);
@@ -2548,10 +2483,6 @@
             const timeRidden = document.getElementById('form-time-ridden').value;
             const unknownDate = document.getElementById('form-date-unknown').checked;
             const unknownTime = document.getElementById('form-time-unknown').checked;
-            const mostRecentDateRidden = document.getElementById('form-most-recent-date-ridden').value;
-            const mostRecentTimeRidden = document.getElementById('form-most-recent-time-ridden').value;
-            const mostRecentUnknownDate = document.getElementById('form-most-recent-date-unknown').checked;
-            const mostRecentUnknownTime = document.getElementById('form-most-recent-time-unknown').checked;
             const rideStatus = normalizeCoasterStatus(document.getElementById('form-ride-status').value);
             const rideCount = parseInt(document.getElementById('form-ride-count').value) || 1;
             const isDuplicate = document.getElementById('form-is-duplicate').checked;
@@ -2562,78 +2493,6 @@
             const coasterpediaOpeningDate = document.getElementById('form-coasterpedia-opening-date').value;
             const coasterpediaClosingDate = document.getElementById('form-coasterpedia-closing-date').value;
             const savedAt = new Date();
-
-            if (relogSourceEntryId) {
-                const sourceGroup = getCoasterLogGroups().find(group =>
-                    group.entries.some(entry => entry.id === relogSourceEntryId)
-                );
-                if (!sourceGroup) {
-                    relogSourceEntryId = '';
-                    showToast('The original log entry could not be found. Please try relogging again.', 'error');
-                    return;
-                }
-                const isSameRide = rideIdentityKey({
-                    ...sourceGroup.entry,
-                    parkName,
-                    parkNameRidden,
-                    coasterName,
-                    coasterNameRidden,
-                    type,
-                    variant,
-                    coasterpediaRideId
-                }) === sourceGroup.key;
-                const reloggedEntry = {
-                    ...sourceGroup.entry,
-                    parkName,
-                    parkNameRidden,
-                    coasterName,
-                    coasterNameRidden,
-                    coasterpediaRideId,
-                    coasterpediaPageId,
-                    coasterpediaParkPageId,
-                    coasterpediaOpeningDate,
-                    coasterpediaClosingDate,
-                    type,
-                    variant,
-                    dateRidden: isSameRide ? sourceGroup.entry.dateRidden || '' : mostRecentDateRidden,
-                    timeRidden: isSameRide ? sourceGroup.entry.timeRidden || '' : mostRecentTimeRidden,
-                    unknownDate: isSameRide ? sourceGroup.entry.unknownDate === true : mostRecentUnknownDate,
-                    unknownTime: isSameRide ? sourceGroup.entry.unknownTime === true : mostRecentUnknownTime,
-                    rideStatus,
-                    rideCount: sourceGroup.rideCount + 1,
-                    notes,
-                    isDuplicate,
-                    loggedAt: isSameRide
-                        ? sourceGroup.entry.loggedAt || savedAt.toISOString()
-                        : savedAt.toISOString(),
-                    mostRecentDateRidden,
-                    mostRecentTimeRidden,
-                    mostRecentUnknownDate,
-                    mostRecentUnknownTime,
-                    mostRecentLoggedAt: savedAt.toISOString()
-                };
-                if (isSameRide) {
-                    const sourceIds = new Set(sourceGroup.entries.map(entry => entry.id));
-                    coasterLog = coasterLog.filter(entry => !sourceIds.has(entry.id));
-                    reloggedEntry.id = sourceGroup.entry.id;
-                    reloggedEntry.rideCount = sourceGroup.rideCount + 1;
-                    coasterLog.unshift(reloggedEntry);
-                    showToast('Coaster relogged', 'success');
-                } else {
-                    reloggedEntry.id = 'entry_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
-                    reloggedEntry.rideCount = 1;
-                    coasterLog.unshift(reloggedEntry);
-                    showToast('New ride version added to your log', 'success');
-                }
-                relogSourceEntryId = '';
-                saveToLocalStorage();
-                updateStatsAndCounters();
-                renderLogbook();
-                closeEntryModal();
-                if (!document.getElementById('park-breakdown').classList.contains('hidden')) renderParkBreakdown();
-                if (!document.getElementById('tab-search').classList.contains('hidden')) renderRidesList();
-                return;
-            }
 
             if (id) {
                 // Edit existing
@@ -2657,11 +2516,6 @@
                         timeRidden,
                         unknownDate,
                         unknownTime,
-                        mostRecentDateRidden,
-                        mostRecentTimeRidden,
-                        mostRecentUnknownDate,
-                        mostRecentUnknownTime,
-                        mostRecentLoggedAt: group?.entry.mostRecentLoggedAt || group?.entry.loggedAt || savedAt.toISOString(),
                         rideStatus,
                         rideCount,
                         notes,
@@ -2692,10 +2546,8 @@
                     timeRidden,
                     unknownDate,
                     unknownTime,
-                    mostRecentDateRidden,
-                    mostRecentTimeRidden,
-                    mostRecentUnknownDate,
-                    mostRecentUnknownTime,
+                    mostRecentDateRidden: unknownDate ? '' : dateRidden,
+                    mostRecentTimeRidden: unknownTime ? '' : timeRidden,
                     rideStatus,
                     loggedAt: new Date().toISOString(),
                     mostRecentLoggedAt: savedAt.toISOString(),

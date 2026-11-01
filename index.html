@@ -394,7 +394,7 @@
                 <div id="rides-content" class="hidden space-y-4">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-bordercolor pb-4">
                         <div>
-                            <h3 id="current-park-title" class="text-base font-bold text-white">Park Attractions</h3>
+                            <h3 id="current-park-title" class="select-none text-base font-bold text-white">Park Attractions</h3>
                         </div>
                         <input type="text" id="ride-search-filter" oninput="filterRidesList()" placeholder="Filter rides in this park..." class="bg-slate-900 border border-bordercolor rounded-xl px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500 w-full sm:w-64">
                     </div>
@@ -433,7 +433,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Park Name</label>
-                        <input type="text" id="form-park-name" oninput="document.getElementById('form-coasterpedia-park-page-id').value = ''" placeholder="e.g. Kings Island" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70 disabled:select-none">
+                        <input type="text" id="form-park-name" oninput="document.getElementById('form-coasterpedia-park-page-id').value = ''" placeholder="e.g. Kings Island" class="select-none w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70 disabled:select-none">
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-400 mb-1">Park Name When Ridden</label>
@@ -445,7 +445,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Official Coaster Name *</label>
-                        <input type="text" id="form-coaster-name" oninput="updateRelogNameVariant()" placeholder="e.g. Queen City Stunt Coaster" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70">
+                        <input type="text" id="form-coaster-name" placeholder="e.g. Queen City Stunt Coaster" required class="select-none w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70">
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Coaster Name When Ridden</label>
@@ -463,10 +463,11 @@
                             <option value="Alpine">Alpine Coaster</option>
                             <option value="Water">Water Coaster</option>
                         </select>
+                        <span id="form-coaster-type-locked" class="hidden rounded-xl border border-bordercolor bg-slate-900 px-3 py-2 text-slate-300"></span>
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Ride Version / Variation *</label>
-                        <select id="form-variant-type" onchange="markRelogVersionManuallySelected()" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70">
+                        <select id="form-variant-type" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                             <option value="Original">Original</option>
                             <option value="ElementChange">Reimagined / experience change</option>
                             <option value="Relocated">Relocated</option>
@@ -496,24 +497,6 @@
                         <label class="mt-2 flex items-center gap-2 text-slate-400">
                             <input type="checkbox" id="form-time-unknown" onchange="toggleUnknownRideDate('time')" class="h-4 w-4 rounded border-bordercolor bg-slate-800 text-brand-600 focus:ring-brand-500">
                             <span>Unknown time</span>
-                        </label>
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block font-semibold text-slate-300 mb-1">Most Recent Date Ridden</label>
-                        <input type="date" id="form-most-recent-date-ridden" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
-                        <label class="mt-2 flex items-center gap-2 text-slate-400">
-                            <input type="checkbox" id="form-most-recent-date-unknown" onchange="toggleUnknownRideDate('mostRecentDate')" class="h-4 w-4 rounded border-bordercolor bg-slate-800 text-brand-600 focus:ring-brand-500">
-                            <span>Unknown most recent date</span>
-                        </label>
-                    </div>
-                    <div>
-                        <label class="block font-semibold text-slate-300 mb-1">Most Recent Time Ridden</label>
-                        <input type="time" id="form-most-recent-time-ridden" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
-                        <label class="mt-2 flex items-center gap-2 text-slate-400">
-                            <input type="checkbox" id="form-most-recent-time-unknown" onchange="toggleUnknownRideDate('mostRecentTime')" class="h-4 w-4 rounded border-bordercolor bg-slate-800 text-brand-600 focus:ring-brand-500">
-                            <span>Unknown most recent time</span>
                         </label>
                     </div>
                 </div>
@@ -604,6 +587,6 @@
     </div>
 
     <script type="module" src="firebase-cloud.js"></script>
-    <script src="app.js?v=coaster-park-filter-20261101-17" defer></script>
+    <script src="app.js?v=relog-form-controls-20261101-19" defer></script>
 </body>
 </html>

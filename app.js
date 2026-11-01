@@ -669,7 +669,8 @@
                 const entry = group.entry;
                 const isDuplicate = duplicateKeys.has(group.key);
                 const openingEntry = group.entries.find(item => item.coasterpediaOpeningDate || item.coasterpediaClosingDate);
-                const operatingDates = [openingEntry?.coasterpediaOpeningDate, openingEntry?.coasterpediaClosingDate]
+                const manualOperatingDates = group.entries.find(item => item.manualOperatingDates)?.manualOperatingDates;
+                const operatingDates = manualOperatingDates || [openingEntry?.coasterpediaOpeningDate, openingEntry?.coasterpediaClosingDate]
                     .map(formatCoasterpediaYear)
                     .filter(Boolean)
                     .join('–');
@@ -2132,6 +2133,7 @@
             const changeVerb = '(?:chang(?:e|ed|es|ing)|modif(?:y|ied|ies|ication)|alter(?:ed|ing)|reconfigur(?:ed|ing)|redesign(?:ed|ing)|replac(?:e|ed|es|ing)|remov(?:e|ed|es|ing)|add(?:ed|s|ing)|install(?:ed|ing)|convert(?:ed|s|ing)|reprofil(?:ed|e|ing))';
             return new RegExp(`\\b${structuralNoun}\\b\\s+(?:was\\s+|were\\s+|has\\s+been\\s+|have\\s+been\\s+)?${changeVerb}\\b`, 'i').test(sentence) ||
                 new RegExp(`\\b${changeVerb}\\b\\s+(?:the\\s+|a\\s+)?${structuralNoun}\\b`, 'i').test(sentence) ||
+                /\b(?:trick track|track elements?|ride elements?|track feature|ride feature)\b[^.!?\n]{0,160}\b(?:removed|replaced|changed|modified|altered|redesigned)\b/i.test(sentence) ||
                 /\b(?:launch|lift hill|drop|inversions?)\b[^.!?\n]{0,80}\b(?:replaced|changed|modified|added|removed|installed|converted)\b/i.test(sentence) ||
                 /\bconverted?\s+(?:from\b.{0,80}\bto\b|into\b.{0,60}\b(?:floorless|stand.?up|sit.?down|inverted|launched|wooden|steel))\b/i.test(sentence);
         }
@@ -2179,6 +2181,23 @@
 
         function formatCoasterpediaYear(value = '') {
             return String(value).match(/\b(?:18|19|20)\d{2}\b/)?.[0] || '';
+        }
+
+        function normalizeManualOperatingDates(value) {
+            const dateRange = String(value || '').trim();
+            if (!dateRange) return '';
+
+            const match = dateRange.match(/^(\d{4})(?:\s*[-–]\s*(\d{4}|present))?$/i);
+            if (!match) return null;
+
+            const startYear = Number(match[1]);
+            const endYear = /^\d{4}$/.test(match[2] || '') ? Number(match[2]) : null;
+            if (startYear < 1800 || (endYear !== null && (endYear < startYear || endYear < 1800))) {
+                return null;
+            }
+
+            if (!match[2]) return String(startYear);
+            return `${startYear}–${endYear === null ? 'present' : endYear}`;
         }
 
         function renderRidesList() {
@@ -2407,6 +2426,7 @@
             document.getElementById('form-coasterpedia-park-page-id').value = '';
             document.getElementById('form-coasterpedia-opening-date').value = '';
             document.getElementById('form-coasterpedia-closing-date').value = '';
+            document.getElementById('form-manual-operating-dates').value = '';
             document.getElementById('form-park-name').value = '';
             document.getElementById('form-park-name').disabled = false;
             document.getElementById('form-park-ridden').value = '';
@@ -2449,6 +2469,7 @@
             document.getElementById('form-coasterpedia-park-page-id').value = entry.coasterpediaParkPageId || '';
             document.getElementById('form-coasterpedia-opening-date').value = entry.coasterpediaOpeningDate || '';
             document.getElementById('form-coasterpedia-closing-date').value = entry.coasterpediaClosingDate || '';
+            document.getElementById('form-manual-operating-dates').value = entry.manualOperatingDates || '';
             document.getElementById('form-park-name').value = entry.parkName || '';
             document.getElementById('form-park-name').disabled =
                 Boolean(entry.coasterpediaParkPageId || entry.coasterpediaRideId);
@@ -2611,6 +2632,14 @@
             const coasterpediaParkPageId = document.getElementById('form-coasterpedia-park-page-id').value;
             const coasterpediaOpeningDate = document.getElementById('form-coasterpedia-opening-date').value;
             const coasterpediaClosingDate = document.getElementById('form-coasterpedia-closing-date').value;
+            const manualOperatingDates = normalizeManualOperatingDates(
+                document.getElementById('form-manual-operating-dates').value
+            );
+            if (manualOperatingDates === null) {
+                showToast('Enter operating dates as a year or year range, such as 2007-2020.', 'error');
+                document.getElementById('form-manual-operating-dates').focus();
+                return;
+            }
             const savedAt = new Date();
 
             if (id) {
@@ -2629,6 +2658,7 @@
                         coasterpediaParkPageId,
                         coasterpediaOpeningDate,
                         coasterpediaClosingDate,
+                        manualOperatingDates,
                         type,
                         variant,
                         dateRidden,
@@ -2659,6 +2689,7 @@
                     coasterpediaParkPageId,
                     coasterpediaOpeningDate,
                     coasterpediaClosingDate,
+                    manualOperatingDates,
                     type,
                     variant,
                     dateRidden,

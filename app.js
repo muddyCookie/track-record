@@ -1051,17 +1051,15 @@
                 format: 'json',
                 origin: '*'
             });
-            const tocResponse = await fetch(`https://coasterpedia.net/w/api.php?${tocParams}`);
-            if (!tocResponse.ok) {
-                throw new Error(`Coasterpedia page lookup failed with status ${tocResponse.status}`);
-            }
+            const tocResponse = await fetchCoasterpediaApi(tocParams, 'Coasterpedia page lookup');
             const tocData = await tocResponse.json();
             const sections = findCoasterpediaSections(tocData.parse?.tocdata?.sections || []);
             if (sections.length === 0) {
                 throw new Error(`"${parkTitle}" does not have a coaster list.`);
             }
 
-            const rides = (await Promise.all(sections.map(async section => {
+            const rides = [];
+            for (const section of sections) {
                 const sectionParams = new URLSearchParams({
                     action: 'parse',
                     page: parkTitle,
@@ -1070,10 +1068,7 @@
                     format: 'json',
                     origin: '*'
                 });
-                const sectionResponse = await fetch(`https://coasterpedia.net/w/api.php?${sectionParams}`);
-                if (!sectionResponse.ok) {
-                    throw new Error(`Coasterpedia coaster list failed with status ${sectionResponse.status}`);
-                }
+                const sectionResponse = await fetchCoasterpediaApi(sectionParams, 'Coasterpedia coaster list');
                 const sectionData = await sectionResponse.json();
                 const parsed = sectionData.parse || {};
                 const renderedRides = parseCoasterpediaRenderedCoasters(
@@ -1081,14 +1076,52 @@
                     parkTitle,
                     section.status
                 );
-                return renderedRides.length
+                rides.push(...(renderedRides.length
                     ? renderedRides
-                    : parseCoasterpediaCoasters(parsed.wikitext?.['*'] || '', parkTitle, section.status);
-            }))).flat();
+                    : parseCoasterpediaCoasters(parsed.wikitext?.['*'] || '', parkTitle, section.status)));
+            }
             if (rides.length === 0) {
                 throw new Error(`No coaster entries were found in "${parkTitle}".`);
             }
             return rides;
+        }
+
+        async function fetchCoasterpediaApi(params, requestLabel) {
+            const url = `https://coasterpedia.net/w/api.php?${params}`;
+            const retryableStatuses = new Set([429, 500, 502, 503, 504]);
+
+            for (let attempt = 0; attempt < 3; attempt++) {
+                let response;
+                try {
+                    response = await fetch(url);
+                } catch (error) {
+                    if (attempt === 2) {
+                        throw new Error(`${requestLabel} request failed: ${error.message}`);
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 500 * (2 ** attempt)));
+                    continue;
+                }
+
+                if (response.ok) return response;
+                if (!retryableStatuses.has(response.status) || attempt === 2) {
+                    throw new Error(`${requestLabel} failed with status ${response.status}`);
+                }
+
+                const retryAfter = response.headers.get('Retry-After');
+                const retryAfterSeconds = Number(retryAfter);
+                const retryAfterDate = Date.parse(retryAfter || '');
+                const retryDelay = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+                    ? retryAfterSeconds * 1000
+                    : Number.isFinite(retryAfterDate)
+                        ? Math.max(0, retryAfterDate - Date.now())
+                        : 500 * (2 ** attempt);
+                const delay = retryDelay > 0
+                    ? Math.min(retryDelay, 10000)
+                    : 500 * (2 ** attempt);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+
+            throw new Error(`${requestLabel} failed after retries`);
         }
 
         function coasterpediaRideReference(value = '') {
@@ -1123,8 +1156,7 @@
                     format: 'json',
                     origin: '*'
                 });
-                const response = await fetch(`https://coasterpedia.net/w/api.php?${params}`);
-                if (!response.ok) throw new Error(`Coasterpedia ride identity lookup failed with status ${response.status}`);
+                const response = await fetchCoasterpediaApi(params, 'Coasterpedia ride identity lookup');
                 const data = await response.json();
                 const aliases = new Map();
                 const pagesByTitle = new Map();
@@ -1277,7 +1309,7 @@
                     origin: '*'
                 });
                 try {
-                    const response = await fetch(`https://coasterpedia.net/w/api.php?${params}`);
+                    const response = await fetchCoasterpediaApi(params, 'Coasterpedia park page lookup');
                     if (response.ok) {
                         const data = await response.json();
                         const page = Object.values(data.query?.pages || []).find(item => item.pageid);
@@ -1317,55 +1349,51 @@
 
             let updatedCount = 0;
             const failedParks = [];
-            const workers = Array.from({ length: Math.min(3, pendingParks.length) }, async () => {
-                while (pendingParks.length > 0) {
-                    const park = pendingParks.shift();
-                    const originalStates = new Map(park.entries.map(entry => [entry, JSON.stringify([
-                        entry.parkName,
-                        entry.coasterpediaParkPageId,
-                        entry.coasterName,
-                        entry.coasterpediaRideId,
-                        entry.coasterpediaPageId,
-                        entry.rideStatus
-                    ])]));
-                    try {
-                        const reference = await resolveCoasterpediaParkReference(park.title, park.pageId);
-                        if (!reference && park.entries.every(entry =>
-                            !entry.coasterpediaRideId && !entry.coasterpediaPageId
-                        )) {
-                            console.info(`Skipping status refresh for "${park.title}": no Coasterpedia park page was found.`);
-                            continue;
-                        }
-                        const parkTitle = reference?.title || park.title;
-                        const parkPageId = reference?.pageId || park.pageId;
-                        park.entries.forEach(entry => {
-                            entry.parkName = parkTitle;
-                            if (parkPageId) entry.coasterpediaParkPageId = parkPageId;
-                        });
-                        const rides = await fetchCoasterpediaParkRides(parkTitle);
-                        await updateLoggedRideStatuses(parkTitle, rides, parkPageId);
-                    } catch (error) {
-                        if (/does not have a coaster list/i.test(error.message || '')) {
-                            console.info(`Skipping status refresh for "${park.title}": Coasterpedia has no coaster list.`);
-                            continue;
-                        }
-                        failedParks.push(park.title);
-                        console.error(`Failed to refresh logged ride status for "${park.title}":`, error);
-                    } finally {
-                        updatedCount += park.entries.filter(entry =>
-                            originalStates.get(entry) !== JSON.stringify([
-                                entry.parkName,
-                                entry.coasterpediaParkPageId,
-                                entry.coasterName,
-                                entry.coasterpediaRideId,
-                                entry.coasterpediaPageId,
-                                entry.rideStatus
-                            ])
-                        ).length;
+            for (const park of pendingParks) {
+                const originalStates = new Map(park.entries.map(entry => [entry, JSON.stringify([
+                    entry.parkName,
+                    entry.coasterpediaParkPageId,
+                    entry.coasterName,
+                    entry.coasterpediaRideId,
+                    entry.coasterpediaPageId,
+                    entry.rideStatus
+                ])]));
+                try {
+                    const reference = await resolveCoasterpediaParkReference(park.title, park.pageId);
+                    if (!reference && park.entries.every(entry =>
+                        !entry.coasterpediaRideId && !entry.coasterpediaPageId
+                    )) {
+                        console.info(`Skipping status refresh for "${park.title}": no Coasterpedia park page was found.`);
+                        continue;
                     }
+                    const parkTitle = reference?.title || park.title;
+                    const parkPageId = reference?.pageId || park.pageId;
+                    park.entries.forEach(entry => {
+                        entry.parkName = parkTitle;
+                        if (parkPageId) entry.coasterpediaParkPageId = parkPageId;
+                    });
+                    const rides = await fetchCoasterpediaParkRides(parkTitle);
+                    await updateLoggedRideStatuses(parkTitle, rides, parkPageId);
+                } catch (error) {
+                    if (/does not have a coaster list/i.test(error.message || '')) {
+                        console.info(`Skipping status refresh for "${park.title}": Coasterpedia has no coaster list.`);
+                        continue;
+                    }
+                    failedParks.push(park.title);
+                    console.error(`Failed to refresh logged ride status for "${park.title}":`, error);
+                } finally {
+                    updatedCount += park.entries.filter(entry =>
+                        originalStates.get(entry) !== JSON.stringify([
+                            entry.parkName,
+                            entry.coasterpediaParkPageId,
+                            entry.coasterName,
+                            entry.coasterpediaRideId,
+                            entry.coasterpediaPageId,
+                            entry.rideStatus
+                        ])
+                    ).length;
                 }
-            });
-            await Promise.all(workers);
+            }
 
             if (updatedCount > 0) {
                 saveToLocalStorage();

@@ -1230,7 +1230,43 @@
                 console.warn(`Coasterpedia ride identity lookup failed for "${parkTitle}"; matching by name only.`, error);
             }
 
+            const changeDetailsTitles = [...new Set(parkEntries
+                .filter(entry => rideEntryVariant(entry) === 'ElementChange' && entry.coasterpediaRideId)
+                .map(entry => coasterpediaRideReference(entry.coasterpediaRideId).pageTitle))]
+                .filter(title => !rides.some(ride =>
+                    (ride.pageTitle || '').toLocaleLowerCase() === title.toLocaleLowerCase() && ride.changeYear
+                ));
+            const articleDetailsByTitle = new Map();
+            if (changeDetailsTitles.length > 0) {
+                try {
+                    for (let offset = 0; offset < changeDetailsTitles.length; offset += 50) {
+                        const params = new URLSearchParams({
+                            action: 'query',
+                            prop: 'revisions',
+                            titles: changeDetailsTitles.slice(offset, offset + 50).join('|'),
+                            rvprop: 'content',
+                            rvslots: 'main',
+                            redirects: 1,
+                            format: 'json',
+                            origin: '*'
+                        });
+                        const response = await fetchCoasterpediaApi(params, 'Coasterpedia ride history lookup');
+                        const data = await response.json();
+                        Object.values(data.query?.pages || {}).forEach(page => {
+                            const wikitext = page.revisions?.[0]?.slots?.main?.['*'] || '';
+                            articleDetailsByTitle.set(
+                                page.title.toLocaleLowerCase(),
+                                extractCoasterpediaInfoboxDetails(wikitext, parkTitle)
+                            );
+                        });
+                    }
+                } catch (error) {
+                    console.warn(`Coasterpedia ride change-date lookup failed for "${parkTitle}".`, error);
+                }
+            }
+
             const ridesByPageId = new Map();
+            const ridesBySourceId = new Map();
             const ridesByName = new Map();
             rides.forEach(ride => {
                 const rideReference = coasterpediaRideReference(ride.sourceRideId || ride.pageTitle || ride.id);
@@ -1244,12 +1280,27 @@
 
                 const rideName = coasterpediaRideBaseName(ride.name, ride.sourceRideId || ride.id);
                 const rideStatus = coasterStatusForRide(ride);
+                const articleDetails = articleDetailsByTitle.get(
+                    (resolved?.title || ride.pageTitle || rideReference.pageTitle).toLocaleLowerCase()
+                );
+                const trackIndex = Number(rideReference.trackIdSuffix.match(/\d+/)?.[0] || 0);
+                const trackVariant = trackIndex
+                    ? articleDetails?.trackVariants?.[trackIndex - 1]
+                    : '';
+                const changeYear = trackVariant === 'Original'
+                    ? ''
+                    : ride.changeYear || articleDetails?.changeYear || '';
                 const rideDetails = {
                     pageId: ride.coasterpediaPageId || '',
                     pageTitle: ride.pageTitle || rideReference.pageTitle,
                     name: rideName,
-                    status: rideStatus
+                    status: rideStatus,
+                    sourceRideId: ride.sourceRideId || rideReference.pageTitle,
+                    openingDate: ride.openingDate || articleDetails?.openingDate || '',
+                    closingDate: ride.closingDate || articleDetails?.closingDate || '',
+                    changeYear
                 };
+                ridesBySourceId.set(rideDetails.sourceRideId.toLocaleLowerCase(), rideDetails);
                 if (rideDetails.pageId) {
                     const previous = ridesByPageId.get(rideDetails.pageId);
                     if (!previous || rideStatus === 'Operating') ridesByPageId.set(rideDetails.pageId, rideDetails);
@@ -1276,10 +1327,14 @@
                     ? pageReferences.get(savedReference.pageTitle.toLocaleLowerCase())
                     : null;
                 const savedPageId = entry.coasterpediaPageId || resolvedSavedReference?.pageId;
+                const resolvedRideTitle = resolvedSavedReference?.title || savedReference.pageTitle;
 
-                let rideDetails = savedPageId
-                    ? ridesByPageId.get(String(savedPageId))
+                let rideDetails = resolvedRideTitle
+                    ? ridesBySourceId.get(`${resolvedRideTitle}${savedReference.trackIdSuffix}`.toLocaleLowerCase())
                     : null;
+                if (!rideDetails && savedPageId) {
+                    rideDetails = ridesByPageId.get(String(savedPageId));
+                }
                 const identityMatched = Boolean(rideDetails);
                 if (!rideDetails) {
                     const candidates = ridesByName.get(normalizeRideStatusName(coasterpediaRideBaseName(
@@ -1294,6 +1349,21 @@
                 }
 
                 if (identityMatched) {
+                    if (rideDetails.changeYear) {
+                        const operatingDates = coasterpediaOperatingDatesForVariant(rideDetails, entry.variant);
+                        if (entry.coasterpediaOpeningDate !== operatingDates.openingDate) {
+                            entry.coasterpediaOpeningDate = operatingDates.openingDate;
+                            changed = true;
+                        }
+                        if (entry.coasterpediaClosingDate !== operatingDates.closingDate) {
+                            entry.coasterpediaClosingDate = operatingDates.closingDate;
+                            changed = true;
+                        }
+                        if (entry.coasterpediaChangeYear !== rideDetails.changeYear) {
+                            entry.coasterpediaChangeYear = rideDetails.changeYear;
+                            changed = true;
+                        }
+                    }
                     if (!entry.coasterpediaPageId && resolvedSavedReference) {
                         entry.coasterpediaPageId = resolvedSavedReference.pageId;
                         changed = true;
@@ -1390,6 +1460,9 @@
                     entry.coasterName,
                     entry.coasterpediaRideId,
                     entry.coasterpediaPageId,
+                    entry.coasterpediaOpeningDate,
+                    entry.coasterpediaClosingDate,
+                    entry.coasterpediaChangeYear,
                     entry.rideStatus
                 ])]));
                 try {
@@ -1423,6 +1496,9 @@
                             entry.coasterName,
                             entry.coasterpediaRideId,
                             entry.coasterpediaPageId,
+                            entry.coasterpediaOpeningDate,
+                            entry.coasterpediaClosingDate,
+                            entry.coasterpediaChangeYear,
                             entry.rideStatus
                         ])
                     ).length;
@@ -2216,6 +2292,24 @@
             return String(value).match(/\b(?:18|19|20)\d{2}\b/)?.[0] || '';
         }
 
+        function coasterpediaOperatingDatesForVariant(ride, variant) {
+            let openingDate = formatCoasterpediaYear(ride.openingDate);
+            let closingDate = formatCoasterpediaYear(ride.closingDate);
+            const changeYear = formatCoasterpediaYear(ride.changeYear);
+
+            if (!changeYear || !['Original', 'ElementChange'].includes(normalizeRideVariant(variant))) {
+                return { openingDate, closingDate };
+            }
+
+            if (normalizeRideVariant(variant) === 'ElementChange') {
+                openingDate = changeYear;
+            } else if (!openingDate || Number(changeYear) > Number(openingDate)) {
+                closingDate = changeYear;
+            }
+
+            return { openingDate, closingDate };
+        }
+
         function normalizeManualOperatingDates(value) {
             const dateRange = String(value || '').trim();
             if (!dateRange) return '';
@@ -2296,10 +2390,11 @@
                     const rideType = ride.rideType || classifyRideLabel(ride.type || '');
                     const variant = displayedVariant;
                     const rideStatus = coasterStatusForRide(ride);
-                    const disambiguatingOpeningDate = sameNameRideCount > 1 ? formatCoasterpediaYear(ride.openingDate) : '';
-                    const disambiguatingClosingDate = sameNameRideCount > 1 ? formatCoasterpediaYear(ride.closingDate) : '';
-                    const rideOpeningDate = formatCoasterpediaYear(ride.openingDate);
-                    const rideClosingDate = formatCoasterpediaYear(ride.closingDate);
+                    const operatingDates = coasterpediaOperatingDatesForVariant(ride, displayedVariant);
+                    const disambiguatingOpeningDate = sameNameRideCount > 1 ? operatingDates.openingDate : '';
+                    const disambiguatingClosingDate = sameNameRideCount > 1 ? operatingDates.closingDate : '';
+                    const rideOpeningDate = operatingDates.openingDate;
+                    const rideClosingDate = operatingDates.closingDate;
                     const disambiguatingDateLabel = [disambiguatingOpeningDate, disambiguatingClosingDate].filter(Boolean).join('–');
                     const dateLabel = disambiguatingDateLabel
                         ? `<p class="mt-1 text-[11px] text-slate-500">Dates ${escapeHtml(disambiguatingDateLabel)}</p>`
@@ -2409,9 +2504,14 @@
             rideStatus.value = ['Operating', 'Not operating', 'Defunct'].includes(status) ? status : 'Operating';
             rideStatus.disabled = Boolean(rideId || ride?.coasterpediaPageId);
             document.getElementById('form-coasterpedia-ride-id').value = rideId;
-            document.getElementById('form-coasterpedia-opening-date').value = openingDate;
-            document.getElementById('form-coasterpedia-closing-date').value = closingDate;
-            setOperatingDatesField('', openingDate, closingDate);
+            const operatingDates = coasterpediaOperatingDatesForVariant(
+                ride || { openingDate, closingDate, changeYear: '' },
+                variant
+            );
+            document.getElementById('form-coasterpedia-opening-date').value = operatingDates.openingDate;
+            document.getElementById('form-coasterpedia-closing-date').value = operatingDates.closingDate;
+            document.getElementById('form-coasterpedia-change-year').value = ride?.changeYear || '';
+            setOperatingDatesField('', operatingDates.openingDate, operatingDates.closingDate);
             document.getElementById('form-coasterpedia-page-id').value = ride?.coasterpediaPageId || '';
             setRideNameVersionOptions(ride, rideName, type, variant);
             selectOfficialCoasterName(rideName);
@@ -2471,6 +2571,7 @@
             document.getElementById('form-coasterpedia-park-page-id').value = '';
             document.getElementById('form-coasterpedia-opening-date').value = '';
             document.getElementById('form-coasterpedia-closing-date').value = '';
+            document.getElementById('form-coasterpedia-change-year').value = '';
             document.getElementById('form-manual-operating-dates').value = '';
             document.getElementById('form-manual-operating-dates').disabled = false;
             document.getElementById('form-park-name').value = '';
@@ -2516,11 +2617,18 @@
             const matchingRide = currentParkRides.find(ride =>
                 (ride.sourceRideId || ride.id) === entry.coasterpediaRideId
             );
-            const openingDate = entry.coasterpediaOpeningDate || matchingRide?.openingDate || '';
-            const closingDate = entry.coasterpediaClosingDate || matchingRide?.closingDate || '';
-            document.getElementById('form-coasterpedia-opening-date').value = openingDate;
-            document.getElementById('form-coasterpedia-closing-date').value = closingDate;
-            setOperatingDatesField(entry.manualOperatingDates || '', openingDate, closingDate);
+            const operatingDates = matchingRide
+                ? coasterpediaOperatingDatesForVariant(matchingRide, entry.variant)
+                : coasterpediaOperatingDatesForVariant({
+                    openingDate: entry.coasterpediaOpeningDate,
+                    closingDate: entry.coasterpediaClosingDate,
+                    changeYear: entry.coasterpediaChangeYear
+                }, entry.variant);
+            document.getElementById('form-coasterpedia-opening-date').value = operatingDates.openingDate;
+            document.getElementById('form-coasterpedia-closing-date').value = operatingDates.closingDate;
+            document.getElementById('form-coasterpedia-change-year').value =
+                matchingRide?.changeYear || entry.coasterpediaChangeYear || '';
+            setOperatingDatesField(entry.manualOperatingDates || '', operatingDates.openingDate, operatingDates.closingDate);
             document.getElementById('form-park-name').value = entry.parkName || '';
             document.getElementById('form-park-name').disabled =
                 Boolean(entry.coasterpediaParkPageId || entry.coasterpediaRideId);
@@ -2680,6 +2788,7 @@
             const coasterpediaParkPageId = document.getElementById('form-coasterpedia-park-page-id').value;
             const coasterpediaOpeningDate = document.getElementById('form-coasterpedia-opening-date').value;
             const coasterpediaClosingDate = document.getElementById('form-coasterpedia-closing-date').value;
+            const coasterpediaChangeYear = document.getElementById('form-coasterpedia-change-year').value;
             const operatingDatesInput = document.getElementById('form-manual-operating-dates');
             const manualOperatingDates = operatingDatesInput.disabled
                 ? ''
@@ -2707,6 +2816,7 @@
                         coasterpediaParkPageId,
                         coasterpediaOpeningDate,
                         coasterpediaClosingDate,
+                        coasterpediaChangeYear,
                         manualOperatingDates,
                         type,
                         variant,
@@ -2738,6 +2848,7 @@
                     coasterpediaParkPageId,
                     coasterpediaOpeningDate,
                     coasterpediaClosingDate,
+                    coasterpediaChangeYear,
                     manualOperatingDates,
                     type,
                     variant,

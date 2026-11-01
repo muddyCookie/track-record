@@ -2056,7 +2056,7 @@
         }
 
         function extractCoasterpediaInfoboxDetails(wikitext, selectedParkName = '') {
-            const infoboxMatch = wikitext.match(/\{\{Infobox (roller coaster|coaster multitrack)\b([\s\S]*?)^\}\}/im);
+            const infoboxMatch = wikitext.match(/\{\{Infobox (roller coaster|coaster multitrack|coaster)\b([\s\S]*?)^\}\}/im);
             const infoboxType = infoboxMatch?.[1].toLocaleLowerCase() || '';
             const infobox = infoboxMatch?.[2] || '';
             const infoboxName = cleanCoasterpediaCell(infobox.match(/^\|name\s*=\s*(.+)$/im)?.[1] || '');
@@ -2124,9 +2124,13 @@
             const dateInfobox = mainParkMatches
                 ? infobox
                 : pastParkInfobox?.wikitext || '';
+            const openingDate = parseCoasterpediaDate(
+                dateInfobox.match(/^[ \t]*\|opened\s*=\s*(.+)$/im)?.[1] || ''
+            );
             const changeEvidence = getCoasterpediaChangeEvidence(wikitext);
             const changeClassification = classifyCoasterpediaChange(wikitext, infobox, nameHistory);
             const currentVersionStart = nameHistory.find(item => item.name === currentName)?.from || '';
+            const isUpdatedVersion = /\bupdated version of\b/i.test(wikitext);
             return {
                 isRollerCoaster: Boolean(infoboxType),
                 hasRideInfobox: /\{\{\s*Infobox ride\b/i.test(wikitext),
@@ -2138,7 +2142,7 @@
                 currentStatus,
                 isCurrentPark: mainParkMatches,
                 hasPastParkRecord: Boolean(pastParkInfobox),
-                openingDate: parseCoasterpediaDate(dateInfobox.match(/^[ \t]*\|opened\s*=\s*(.+)$/im)?.[1] || ''),
+                openingDate,
                 closingDate: parseCoasterpediaDate(dateInfobox.match(/^[ \t]*\|closed\s*=\s*(.+)$/im)?.[1] || ''),
                 changeClassification,
                 changeEvidence: changeEvidence.find(item => item.type === 'major')?.text ||
@@ -2149,6 +2153,7 @@
                     ? currentVersionStart.match(/\b(?:18|19|20)\d{2}\b/)?.[0] ||
                         (changeEvidence.find(item => ['major', 'track', 'structural'].includes(item.type))?.text || '')
                             .match(/\b(?:18|19|20)\d{2}\b/)?.[0] ||
+                        (isUpdatedVersion ? formatCoasterpediaYear(openingDate) : '') ||
                         ''
                     : '',
                 hasReimaginedVersion: changeClassification === 'reimagined' && nameHistory.length < 2,
@@ -2264,6 +2269,7 @@
 
         function isMajorRideTransformation(sentence) {
             return /\b(?:virtual reality|vr)\s+(?:overlay|experience|conversion|version)\b/i.test(sentence) ||
+                /\bupdated version of\b/i.test(sentence) ||
                 isRideTypeConversion(sentence) ||
                 /\bfloorless\s+conversion\b/i.test(sentence) ||
                 /\bconversion\b[^.!?\n]{0,100}\bfloorless\b/i.test(sentence) ||

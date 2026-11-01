@@ -1824,8 +1824,13 @@
                 ride.openingDate = details.openingDate;
                 ride.closingDate = details.closingDate;
                 const currentStatus = normalizeCoasterStatus(details.currentStatus);
-                if (['Under construction', 'Not operating', 'Operating', 'Defunct'].includes(currentStatus)) {
-                    ride.entityType = `${currentStatus} coaster`;
+                const rideStatus = ['Under construction', 'Not operating', 'Operating', 'Defunct'].includes(currentStatus)
+                    ? currentStatus
+                    : !details.isCurrentPark && details.hasPastParkRecord && details.closingDate
+                        ? 'Defunct'
+                        : '';
+                if (rideStatus) {
+                    ride.entityType = `${rideStatus} coaster`;
                 }
                 if (details.tracks < 2) return;
                 ride.trackCount = details.tracks;
@@ -1864,9 +1869,12 @@
                     return rides[0];
                 }
 
-                const canonicalRide = rides.find(ride => ride.entityType === 'Operating coaster') ||
+                const canonicalRide = rides.find(ride => ride.entityType === 'Defunct coaster') ||
+                    rides.find(ride => ride.entityType === 'Operating coaster') ||
                     rides.find(ride => ride.entityType === 'Not operating coaster') || rides[0];
-                if (rides.some(ride => ride.entityType === 'Operating coaster')) {
+                if (rides.some(ride => ride.entityType === 'Defunct coaster')) {
+                    canonicalRide.entityType = 'Defunct coaster';
+                } else if (rides.some(ride => ride.entityType === 'Operating coaster')) {
                     canonicalRide.entityType = 'Operating coaster';
                 }
                 canonicalRide.hasRelocatedHistory = rides.some(ride => ride.hasRelocatedHistory || ride.variant === 'Relocated');
@@ -1939,6 +1947,8 @@
                     /^\|product\s*=.*\bwater coaster\b/im.test(wikitext),
                 tracks: trackCount ? Number(trackCount[1]) : 1,
                 currentStatus,
+                isCurrentPark: mainParkMatches,
+                hasPastParkRecord: Boolean(pastParkInfobox),
                 openingDate: parseCoasterpediaDate(dateInfobox.match(/^[ \t]*\|opened\s*=\s*(.+)$/im)?.[1] || ''),
                 closingDate: parseCoasterpediaDate(dateInfobox.match(/^[ \t]*\|closed\s*=\s*(.+)$/im)?.[1] || ''),
                 changeClassification,

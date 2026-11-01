@@ -457,13 +457,12 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Ride Type *</label>
-                        <select id="form-coaster-type" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70">
+                        <select id="form-coaster-type" required class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed">
                             <option value="Real">Roller Coaster</option>
                             <option value="Powered">Powered Coaster</option>
                             <option value="Alpine">Alpine Coaster</option>
                             <option value="Water">Water Coaster</option>
                         </select>
-                        <span id="form-coaster-type-locked" class="hidden rounded-xl border border-bordercolor bg-slate-900 px-3 py-2 text-slate-300"></span>
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Ride Version / Variation *</label>
@@ -587,6 +586,6 @@
     </div>
 
     <script type="module" src="firebase-cloud.js"></script>
-    <script src="app.js?v=defunct-history-20261101-20" defer></script>
+    <script src="app.js?v=ride-type-select-20261101-21" defer></script>
 </body>
 </html>

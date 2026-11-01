@@ -2285,11 +2285,7 @@
             nameInput.disabled = Boolean(ride || document.getElementById('form-coasterpedia-ride-id').value);
             const classificationLocked = Boolean(ride || document.getElementById('form-coasterpedia-ride-id').value);
             const rideTypeSelect = document.getElementById('form-coaster-type');
-            const rideTypeDisplay = document.getElementById('form-coaster-type-locked');
             rideTypeSelect.disabled = classificationLocked;
-            rideTypeSelect.classList.toggle('hidden', classificationLocked);
-            rideTypeDisplay.classList.toggle('hidden', !classificationLocked);
-            rideTypeDisplay.textContent = rideTypeSelect.selectedOptions[0]?.textContent || '';
             document.getElementById('form-variant-type').disabled = false;
         }
 

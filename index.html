@@ -290,10 +290,10 @@
                 </button>
 
                 <!-- Total -->
-                <button type="button" onclick="applyDashboardFilter('credits')" data-filter-kind="credits" style="--active-accent: 16, 185, 129" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-brand-300 transition">
+                <button type="button" onclick="applyDashboardFilter('credits')" data-filter-kind="credits" style="--active-accent: 255, 255, 255" class="dashboard-stat-card text-left bg-cardbg p-4 rounded-2xl border border-bordercolor relative overflow-hidden group hover:border-white/70 transition">
                     <div class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Total</div>
                     <div id="stat-total" class="text-3xl font-black text-white">0</div>
-                    <i class="fa-solid fa-trophy absolute -right-2 -bottom-2 text-5xl text-brand-500/20 group-hover:text-brand-500/30 transition"></i>
+                    <i class="fa-solid fa-trophy absolute -right-2 -bottom-2 text-5xl text-slate-100/20 group-hover:text-slate-100/30 transition"></i>
                 </button>
             </div>
             <!-- Logbook Header & Search/Filter Controls -->
@@ -310,7 +310,7 @@
                 <!-- Filters -->
                 <div id="log-action-controls" class="w-full md:w-auto flex flex-col sm:flex-row items-center gap-2">
                     <button onclick="openAddModal()" class="w-full sm:w-auto whitespace-nowrap px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand-600 hover:bg-brand-500 text-white flex items-center justify-center gap-1.5 transition">
-                        <i class="fa-solid fa-plus"></i> Add Manual Entry
+                        <i class="fa-solid fa-plus"></i> Add Custom Entry
                     </button>
                     <div class="relative w-full sm:w-64">
                         <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
@@ -363,7 +363,7 @@
                     </div>
                 </div>
 
-                <p class="text-[11px] text-slate-500">Park coaster lists are provided by <a href="https://coasterpedia.net/" target="_blank" rel="noopener noreferrer" class="text-brand-400 hover:text-brand-300 underline">Coasterpedia</a>. For standalone coasters not listed here, use "Add Manual Entry" in Credits.</p>
+                <p class="text-[11px] text-slate-500">Park coaster lists are provided by <a href="https://coasterpedia.net/" target="_blank" rel="noopener noreferrer" class="text-brand-400 hover:text-brand-300 underline">Coasterpedia</a>. For standalone coasters not listed here, use "Add Custom Entry" in Credits.</p>
 
                 <div class="relative">
                     <label for="park-search-input" class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Search parks</label>
@@ -430,8 +430,8 @@
                 <!-- Park Names Row -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="block font-semibold text-slate-300 mb-1">Park Name <span class="text-slate-500 font-normal">(optional for standalone rides)</span></label>
-                        <input type="text" id="form-park-name" oninput="document.getElementById('form-coasterpedia-park-page-id').value = ''" placeholder="e.g. Kings Island" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <label class="block font-semibold text-slate-300 mb-1">Park Name</label>
+                        <input type="text" id="form-park-name" oninput="document.getElementById('form-coasterpedia-park-page-id').value = ''" placeholder="e.g. Kings Island" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 read-only:cursor-not-allowed read-only:opacity-70">
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-400 mb-1">Park Name When Ridden</label>
@@ -481,7 +481,7 @@
                 <!-- Date & Counts -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="block font-semibold text-slate-300 mb-1">Date Ridden</label>
+                        <label id="form-date-ridden-label" class="block font-semibold text-slate-300 mb-1">Date Ridden</label>
                         <input type="date" id="form-date-ridden" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                         <label class="mt-2 flex items-center gap-2 text-slate-400">
                             <input type="checkbox" id="form-date-unknown" onchange="toggleUnknownRideDate('date')" class="h-4 w-4 rounded border-bordercolor bg-slate-800 text-brand-600 focus:ring-brand-500">
@@ -489,7 +489,7 @@
                         </label>
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-300 mb-1">Time Ridden</label>
+                        <label id="form-time-ridden-label" class="block font-semibold text-slate-300 mb-1">Time Ridden</label>
                         <input type="time" id="form-time-ridden" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                         <label class="mt-2 flex items-center gap-2 text-slate-400">
                             <input type="checkbox" id="form-time-unknown" onchange="toggleUnknownRideDate('time')" class="h-4 w-4 rounded border-bordercolor bg-slate-800 text-brand-600 focus:ring-brand-500">

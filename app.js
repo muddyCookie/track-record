@@ -684,6 +684,16 @@
                     : '';
 
                 const rideDateTime = formatRideDateTime(entry);
+                const mostRecentRideDateTime = entry.mostRecentDateRidden || entry.mostRecentTimeRidden ||
+                    entry.mostRecentUnknownDate || entry.mostRecentUnknownTime
+                    ? formatRideDateTime({
+                        dateRidden: entry.mostRecentDateRidden,
+                        timeRidden: entry.mostRecentTimeRidden,
+                        unknownDate: entry.mostRecentUnknownDate,
+                        unknownTime: entry.mostRecentUnknownTime,
+                        loggedAt: entry.mostRecentLoggedAt
+                    })
+                    : '';
                 const rideStatus = normalizeCoasterStatus(entry.rideStatus || 'Status unknown');
 
                 html += `
@@ -698,7 +708,8 @@
                                 : ''}
                             <div class="flex flex-col gap-2 text-xs text-slate-400 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
                                 <div class="flex flex-wrap items-center gap-3">
-                                    ${rideDateTime ? `<span><i class="fa-regular fa-calendar mr-1"></i>${escapeHtml(rideDateTime)}</span>` : ''}
+                                    ${rideDateTime ? `<span><i class="fa-regular fa-calendar mr-1"></i>First ridden: ${escapeHtml(rideDateTime)}</span>` : ''}
+                                    ${mostRecentRideDateTime ? `<span><i class="fa-regular fa-clock mr-1"></i>Most recent: ${escapeHtml(mostRecentRideDateTime)}</span>` : ''}
                                     <span class="rounded-md border border-slate-700 px-2 py-0.5 text-[10px] uppercase tracking-wide">${escapeHtml(rideStatus)}</span>
                                     ${operatingDates ? `<span class="text-slate-500">Dates ${escapeHtml(operatingDates)}</span>` : ''}
                                     ${group.rideCount > 1 ? `<span><i class="fa-solid fa-ticket mr-1"></i>${group.rideCount} laps</span>` : ''}
@@ -913,7 +924,8 @@
         }
 
         function coasterpediaCoasterEra(heading) {
-            if (/^(?:not operating|standing but not operating|under construction|under refurbishment|in storage|temporarily closed|never operated)$/i.test(heading)) return 'Not operating';
+            if (/^under construction$/i.test(heading)) return 'Under construction';
+            if (/^(?:not operating|standing but not operating|under refurbishment|in storage|temporarily closed|never operated)$/i.test(heading)) return 'Not operating';
             if (/^(?:present|current|operating)$/i.test(heading)) return 'Operating';
             if (/^(?:past|former|defunct)$/i.test(heading)) return 'Defunct';
             return null;
@@ -921,9 +933,10 @@
 
         function normalizeCoasterStatus(status = 'Unknown') {
             const value = String(status || 'Unknown').trim();
+            if (/^under construction$/i.test(value)) return 'Under construction';
             if (/^(?:present|current|operating)$/i.test(value)) return 'Operating';
             if (/^(?:former|past|defunct)$/i.test(value)) return 'Defunct';
-            if (/^(?:not operating|standing but not operating|under construction|under refurbishment|in storage|temporarily closed|never operated)$/i.test(value)) return 'Not operating';
+            if (/^(?:not operating|standing but not operating|under refurbishment|in storage|temporarily closed|never operated)$/i.test(value)) return 'Not operating';
             return value;
         }
 
@@ -933,6 +946,13 @@
 
         function isNotOperatingCoasterRow(value = '') {
             return /\b(?:not operating|under construction|under refurbishment|in storage|temporarily closed)\b/i.test(value);
+        }
+
+        function coasterpediaCoasterRowStatus(rowText, sectionStatus) {
+            if (sectionStatus === 'Defunct') return sectionStatus;
+            if (/\bunder construction\b/i.test(rowText)) return 'Under construction';
+            if (sectionStatus === 'Not operating' || isNotOperatingCoasterRow(rowText)) return 'Not operating';
+            return sectionStatus;
         }
 
         function coasterpediaCoasterListHeadingEra(heading) {
@@ -1405,7 +1425,7 @@
 
                 rows.forEach(row => {
                     if (row === headerRow || /\bnever operated\b/i.test(row.textContent)) return;
-                    const rowStatus = isNotOperatingCoasterRow(row.textContent) ? 'Not operating' : status;
+                    const rowStatus = coasterpediaCoasterRowStatus(row.textContent, status);
                     const cells = [...row.children].filter(cell => cell.tagName === 'TH' || cell.tagName === 'TD');
                     if (!cells.length) return;
                     const nameCell = cells[nameColumn >= 0 ? nameColumn : 0];
@@ -1457,7 +1477,7 @@
 
                 table.split(/^\|-/m).slice(1).forEach(row => {
                     if (/\bnever operated\b/i.test(row)) return;
-                    const rowStatus = isNotOperatingCoasterRow(row) ? 'Not operating' : rideStatus;
+                    const rowStatus = coasterpediaCoasterRowStatus(row, rideStatus);
                     const cells = [];
                     row.split(/\r?\n/).map(line => line.trim())
                         .filter(line => line.startsWith('|') && !line.startsWith('|}') && !line.startsWith('|+'))
@@ -1791,11 +1811,7 @@
                 ride.id = canonicalTitle;
                 ride.coasterpediaPageId = pageIdByTitle.get(canonicalTitle.toLocaleLowerCase()) || ride.coasterpediaPageId || '';
                 if (!details) return;
-                ride.variant = details.changeClassification === 'reimagined'
-                    ? 'ElementChange'
-                    : details.hasRelocatedHistory
-                        ? 'Relocated'
-                        : 'Original';
+                ride.variant = details.hasRelocatedHistory ? 'Relocated' : 'Original';
                 ride.hasReimaginedVersion = false;
                 ride.hasRelocatedHistory = details.hasRelocatedHistory;
                 ride.openingDate = details.openingDate;
@@ -1804,7 +1820,9 @@
                 ride.trackCount = details.tracks;
                 ride.trackNames = details.tracks === 2 && ride.name.toLowerCase() === 'gemini'
                     ? ['Red Track', 'Blue Track']
-                    : Array.from({ length: details.tracks }, (_, index) => `Track ${index + 1}`);
+                    : details.tracks === 2
+                        ? ['Left Track', 'Right Track']
+                        : Array.from({ length: details.tracks }, (_, index) => `Track ${index + 1}`);
             });
 
             collapseDuplicateCoasterPages();
@@ -1841,11 +1859,7 @@
                     canonicalRide.entityType = 'Operating coaster';
                 }
                 canonicalRide.hasRelocatedHistory = rides.some(ride => ride.hasRelocatedHistory || ride.variant === 'Relocated');
-                canonicalRide.variant = rides.some(ride => ride.variant === 'ElementChange')
-                        ? 'ElementChange'
-                        : canonicalRide.hasRelocatedHistory
-                            ? 'Relocated'
-                            : 'Original';
+                canonicalRide.variant = canonicalRide.hasRelocatedHistory ? 'Relocated' : 'Original';
                 canonicalRide.hasReimaginedVersion = false;
                 return canonicalRide;
             });
@@ -2078,28 +2092,13 @@
                 return;
             }
 
-            let html = '';
-            const sections = [
-                { title: 'Operating', rides: filtered.filter(ride => ride.entityType === 'Operating coaster') },
-                { title: 'Not operating', rides: filtered.filter(ride => ride.entityType === 'Not operating coaster') },
-                { title: 'Defunct', rides: filtered.filter(ride => ride.entityType === 'Defunct coaster') }
-            ];
-
-            sections.forEach(section => {
-                if (section.rides.length === 0) return;
-                html += `
-                    <details open class="group overflow-hidden rounded-xl border border-bordercolor bg-slate-900/40">
-                        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 hover:bg-slate-800/70">
-                            <span class="text-xs font-bold uppercase tracking-wider text-slate-300">${section.title}<span class="ml-2 text-slate-500">${section.rides.length}</span></span>
-                            <i class="fa-solid fa-chevron-down text-[10px] text-slate-500 transition-transform group-open:rotate-180"></i>
-                        </summary>
-                        <div class="divide-y divide-bordercolor/70 border-t border-bordercolor">
-                `;
-                section.rides.forEach(ride => {
+            const renderRideRows = rides => {
+                let rideRows = '';
+                rides.forEach(ride => {
                     const rideSourceId = ride.sourceRideId || ride.id;
                     const sameNameRideCount = distinctRideIdsByName.get(ride.name.toLocaleLowerCase())?.size || 1;
                     const displayedRideName = ride.name;
-                    const displayedVariant = normalizeRideVariant(ride.variant);
+                    const displayedVariant = normalizeRideVariant(ride.variant) === 'Relocated' ? 'Relocated' : 'Original';
                     const matchingParkEntries = coasterLog.filter(entry =>
                         (entry.parkName || entry.parkNameRidden || '').toLocaleLowerCase() === ride.parkName.toLocaleLowerCase() &&
                         (entry.coasterpediaRideId === rideSourceId ||
@@ -2120,14 +2119,14 @@
                             rideEntryVariant(entry) === displayedVariant &&
                             entryMatchesDisplayedName(entry)
                         )
-                        : null);
-                    const reimaginedEntry = matchingParkEntries.find(entry =>
-                        entry.coasterpediaRideId === rideSourceId &&
-                        rideEntryVariant(entry) === 'ElementChange'
-                    );
+                        : null) || matchingParkEntries.find(entry =>
+                            entry.coasterpediaRideId === rideSourceId && entryMatchesDisplayedName(entry)
+                        ) || (sameNameRideCount === 1
+                            ? matchingParkEntries.find(entry => entryMatchesDisplayedName(entry))
+                            : null);
                     const articleUrl = `https://coasterpedia.net/wiki/${encodeURIComponent(ride.pageTitle.replace(/ /g, '_'))}`;
                     const rideType = ride.rideType || classifyRideLabel(ride.type || '');
-                    const variant = displayedVariant;
+                    const variant = loggedEntry ? rideEntryVariant(loggedEntry) : displayedVariant;
                     const rideStatus = coasterStatusForRide(ride);
                     const disambiguatingOpeningDate = sameNameRideCount > 1 ? formatCoasterpediaYear(ride.openingDate) : '';
                     const disambiguatingClosingDate = sameNameRideCount > 1 ? formatCoasterpediaYear(ride.closingDate) : '';
@@ -2135,23 +2134,17 @@
                     const dateLabel = disambiguatingDateLabel
                         ? `<p class="mt-1 text-[11px] text-slate-500">Dates ${escapeHtml(disambiguatingDateLabel)}</p>`
                         : '';
-                    const reimaginedAction = ride.hasReimaginedVersion
-                        ? (reimaginedEntry
-                            ? `<button data-entry-id="${escapeHtml(reimaginedEntry.id)}" data-current-name="${escapeHtml(ride.name)}" data-status="${rideStatus}" data-ride-type="${ride.type || 'Real'}" data-ride-id="${escapeHtml(rideSourceId)}" onclick="relogEntry(this.dataset.entryId, {name: this.dataset.currentName, status: this.dataset.status, type: this.dataset.rideType, variant: 'ElementChange', rideId: this.dataset.rideId})" class="rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-[11px] font-semibold text-violet-300 transition hover:bg-violet-500/20"><i class="fa-solid fa-rotate mr-1"></i>Relog Reimagined</button>`
-                            : `<button data-park-name="${escapeHtml(ride.parkName)}" data-ride-name="${escapeHtml(ride.name)}" data-ride-type="${ride.type || 'Real'}" data-status="${rideStatus}" data-ride-id="${escapeHtml(rideSourceId)}" onclick="quickLogRide(this.dataset.parkName, this.dataset.rideName, 'ElementChange', this.dataset.rideType, this.dataset.status, this.dataset.rideId)" class="rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-[11px] font-semibold text-violet-300 transition hover:bg-violet-500/20"><i class="fa-solid fa-plus mr-1"></i>Log Reimagined</button>`)
-                        : '';
 
-                    html += `
+                    rideRows += `
                         <div class="flex flex-col gap-2 px-4 py-3 transition hover:bg-slate-800/40 sm:flex-row sm:items-center sm:justify-between">
                             <div class="min-w-0">
                                 <div class="flex min-w-0 items-center gap-2 flex-wrap">
                                     <a href="${articleUrl}" target="_blank" rel="noopener noreferrer" class="truncate text-sm font-semibold text-slate-100 hover:text-brand-400">${escapeHtml(displayedRideName)}</a>
                                     <span class="rounded-md border border-brand-500/20 bg-brand-500/10 px-2 py-0.5 text-[10px] font-semibold text-brand-300">${escapeHtml(rideType)}</span>
-                                    ${variant === 'ElementChange' || variant === 'Relocated'
-                                        ? `<span class="rounded-md border ${variant === 'ElementChange' ? 'border-violet-500/20 bg-violet-500/10 text-violet-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-300'} px-2 py-0.5 text-[10px] font-semibold">${escapeHtml(rideVariantLabel(variant))}</span>`
+                                    ${variant === 'Relocated'
+                                        ? `<span class="rounded-md border border-amber-500/20 bg-amber-500/10 text-amber-300 px-2 py-0.5 text-[10px] font-semibold">${escapeHtml(rideVariantLabel(variant))}</span>`
                                         : ''}
                                 </div>
-                                ${ride.hasReimaginedVersion ? `<p class="mt-1 text-[11px] text-violet-300">Coasterpedia history indicates a substantial ride change${ride.changeYear ? ` around ${escapeHtml(ride.changeYear)}` : ''}; you can log the reimagined version separately.</p>` : ''}
                                 ${dateLabel}
                                 ${sameNameRideCount > 1 && matchingParkEntries.some(entry => !entry.coasterpediaRideId)
                                     ? '<p class="mt-1 text-[10px] text-amber-400">Older same-name logs are not assigned to a specific ride. New logs will be distinguished automatically.</p>'
@@ -2162,16 +2155,54 @@
                                     <button data-entry-id="${escapeHtml(loggedEntry.id)}" data-current-name="${escapeHtml(displayedRideName)}" data-status="${rideStatus}" data-ride-type="${ride.type || 'Real'}" data-variant="${variant}" data-ride-id="${escapeHtml(rideSourceId)}" data-opening-date="${escapeHtml(disambiguatingOpeningDate)}" data-closing-date="${escapeHtml(disambiguatingClosingDate)}" onclick="relogEntry(this.dataset.entryId, {name: this.dataset.currentName, status: this.dataset.status, type: this.dataset.rideType, variant: this.dataset.variant, rideId: this.dataset.rideId, openingDate: this.dataset.openingDate, closingDate: this.dataset.closingDate})" class="rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-1.5 text-[11px] font-semibold text-brand-300 transition hover:bg-brand-500/20"><i class="fa-solid fa-rotate mr-1"></i>Relog</button>
                                     <button data-entry-id="${escapeHtml(loggedEntry.id)}" data-current-name="${escapeHtml(displayedRideName)}" onclick="openRideEntryEdit(this.dataset.entryId, this.dataset.currentName)" class="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[11px] font-semibold text-rose-300 transition hover:bg-rose-500/20"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
                                     <button data-entry-id="${escapeHtml(loggedEntry.id)}" onclick="deleteEntry(this.dataset.entryId)" class="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300 transition hover:bg-rose-500/20" title="Delete log entry" aria-label="Delete ${escapeHtml(displayedRideName)} log entry"><i class="fa-solid fa-trash"></i></button>
-                                    ${reimaginedAction}
                                 </div>`
                                 : `<div class="flex flex-wrap gap-2 self-end sm:self-auto">
                                     <button data-park-name="${escapeHtml(ride.parkName)}" data-ride-name="${escapeHtml(displayedRideName)}" data-ride-type="${ride.type || 'Real'}" data-variant="${variant}" data-status="${rideStatus}" data-ride-id="${escapeHtml(rideSourceId)}" data-opening-date="${escapeHtml(disambiguatingOpeningDate)}" data-closing-date="${escapeHtml(disambiguatingClosingDate)}" onclick="quickLogRide(this.dataset.parkName, this.dataset.rideName, this.dataset.variant, this.dataset.rideType, this.dataset.status, this.dataset.rideId, this.dataset.openingDate, this.dataset.closingDate)" class="rounded-lg bg-brand-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-brand-500"><i class="fa-solid fa-plus mr-1"></i>Log Coaster</button>
-                                    ${reimaginedAction}
                                 </div>`}
                         </div>
                     `;
                 });
-                html += '</div></details>';
+                return rideRows;
+            };
+
+            let html = '';
+            const operatingRides = filtered.filter(ride => ride.entityType === 'Operating coaster');
+            const constructionRides = filtered.filter(ride => ride.entityType === 'Under construction coaster');
+            const sections = [
+                {
+                    title: 'Operating',
+                    rides: operatingRides,
+                    childSections: [{ title: 'Under construction', rides: constructionRides }]
+                },
+                { title: 'Not operating', rides: filtered.filter(ride => ride.entityType === 'Not operating coaster') },
+                { title: 'Defunct', rides: filtered.filter(ride => ride.entityType === 'Defunct coaster') }
+            ];
+
+            sections.forEach(section => {
+                const childSections = (section.childSections || []).filter(child => child.rides.length > 0);
+                const sectionCount = section.rides.length +
+                    childSections.reduce((total, child) => total + child.rides.length, 0);
+                if (sectionCount === 0) return;
+                html += `
+                    <details open class="group overflow-hidden rounded-xl border border-bordercolor bg-slate-900/40">
+                        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 hover:bg-slate-800/70">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-300">${section.title}<span class="ml-2 text-slate-500">${sectionCount}</span></span>
+                            <i class="fa-solid fa-chevron-down text-[10px] text-slate-500 transition-transform group-open:rotate-180"></i>
+                        </summary>
+                        ${section.rides.length ? `<div class="divide-y divide-bordercolor/70 border-t border-bordercolor">${renderRideRows(section.rides)}</div>` : ''}
+                `;
+                childSections.forEach(child => {
+                    html += `
+                        <details open class="group overflow-hidden border-t border-bordercolor/70">
+                            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 bg-slate-900/60 px-4 py-2.5 hover:bg-slate-800/70">
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">${child.title}<span class="ml-2 text-slate-500">${child.rides.length}</span></span>
+                                <i class="fa-solid fa-chevron-down text-[10px] text-slate-500 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <div class="divide-y divide-bordercolor/70 border-t border-bordercolor">${renderRideRows(child.rides)}</div>
+                        </details>
+                    `;
+                });
+                html += '</details>';
             });
 
             grid.innerHTML = html;
@@ -2191,6 +2222,7 @@
         function quickLogRide(parkName, rideName, variant = 'Original', type = 'Real', status = 'Unknown', rideId = '', openingDate = '', closingDate = '') {
             if (!openAddModal()) return;
             document.getElementById('form-park-name').value = parkName;
+            document.getElementById('form-park-name').readOnly = true;
             document.getElementById('form-coasterpedia-park-page-id').value = currentParkPageId;
             document.getElementById('form-park-ridden').value = '';
             document.getElementById('form-coaster-ridden').value = '';
@@ -2262,10 +2294,13 @@
             document.getElementById('form-coasterpedia-opening-date').value = '';
             document.getElementById('form-coasterpedia-closing-date').value = '';
             document.getElementById('form-park-name').value = '';
+            document.getElementById('form-park-name').readOnly = false;
             document.getElementById('form-park-ridden').value = '';
             document.getElementById('form-coaster-name').value = '';
             document.getElementById('form-coaster-name').disabled = false;
             document.getElementById('form-coaster-ridden').value = '';
+            document.getElementById('form-date-ridden-label').textContent = 'Date Ridden';
+            document.getElementById('form-time-ridden-label').textContent = 'Time Ridden';
             document.getElementById('form-coaster-type').value = 'Real';
             document.getElementById('form-variant-type').value = 'Original';
             const now = new Date();
@@ -2302,11 +2337,15 @@
             document.getElementById('form-coasterpedia-opening-date').value = entry.coasterpediaOpeningDate || '';
             document.getElementById('form-coasterpedia-closing-date').value = entry.coasterpediaClosingDate || '';
             document.getElementById('form-park-name').value = entry.parkName || '';
+            document.getElementById('form-park-name').readOnly =
+                Boolean(entry.coasterpediaParkPageId || entry.coasterpediaRideId);
             document.getElementById('form-park-ridden').value = entry.parkNameRidden || '';
             document.getElementById('form-coaster-name').value = entry.coasterName || '';
             document.getElementById('form-coaster-ridden').value = entry.coasterNameRidden !== entry.coasterName
                 ? entry.coasterNameRidden || ''
                 : '';
+            document.getElementById('form-date-ridden-label').textContent = 'Date Ridden';
+            document.getElementById('form-time-ridden-label').textContent = 'Time Ridden';
             document.getElementById('form-coaster-type').value = entry.type || 'Real';
             document.getElementById('form-variant-type').value = rideEntryVariant(entry);
             document.getElementById('form-date-ridden').value = entry.dateRidden || '';
@@ -2357,6 +2396,8 @@
                     : '';
                 document.getElementById('form-coasterpedia-park-page-id').value =
                     group.entry.coasterpediaParkPageId || selectedParkPageId;
+                document.getElementById('form-park-name').readOnly =
+                    Boolean(document.getElementById('form-coasterpedia-park-page-id').value);
                 setRideNameVersionOptions(
                     ride,
                     rideDetails.name,
@@ -2378,6 +2419,8 @@
             document.getElementById('form-entry-submit').textContent = 'Save Relog';
             document.getElementById('form-date-ridden').value = formatLocalDate(now);
             document.getElementById('form-time-ridden').value = formatLocalTime(now);
+            document.getElementById('form-date-ridden-label').textContent = 'Relog Date';
+            document.getElementById('form-time-ridden-label').textContent = 'Relog Time';
             document.getElementById('form-date-unknown').checked = false;
             document.getElementById('form-time-unknown').checked = false;
             toggleUnknownRideDate('date');
@@ -2491,6 +2534,16 @@
                     showToast('The original log entry could not be found. Please try relogging again.', 'error');
                     return;
                 }
+                const isSameRide = rideIdentityKey({
+                    ...sourceGroup.entry,
+                    parkName,
+                    parkNameRidden,
+                    coasterName,
+                    coasterNameRidden,
+                    type,
+                    variant,
+                    coasterpediaRideId
+                }) === sourceGroup.key;
                 const reloggedEntry = {
                     ...sourceGroup.entry,
                     parkName,
@@ -2504,17 +2557,23 @@
                     coasterpediaClosingDate,
                     type,
                     variant,
-                    dateRidden,
-                    timeRidden,
-                    unknownDate,
-                    unknownTime,
+                    dateRidden: isSameRide ? sourceGroup.entry.dateRidden || '' : dateRidden,
+                    timeRidden: isSameRide ? sourceGroup.entry.timeRidden || '' : timeRidden,
+                    unknownDate: isSameRide ? sourceGroup.entry.unknownDate === true : unknownDate,
+                    unknownTime: isSameRide ? sourceGroup.entry.unknownTime === true : unknownTime,
                     rideStatus,
                     rideCount: sourceGroup.rideCount + 1,
                     notes,
                     isDuplicate,
-                    loggedAt: savedAt.toISOString()
+                    loggedAt: isSameRide
+                        ? sourceGroup.entry.loggedAt || savedAt.toISOString()
+                        : savedAt.toISOString(),
+                    mostRecentDateRidden: isSameRide ? dateRidden : '',
+                    mostRecentTimeRidden: isSameRide ? timeRidden : '',
+                    mostRecentUnknownDate: isSameRide ? unknownDate : false,
+                    mostRecentUnknownTime: isSameRide ? unknownTime : false,
+                    mostRecentLoggedAt: isSameRide ? savedAt.toISOString() : ''
                 };
-                const isSameRide = rideIdentityKey(reloggedEntry) === sourceGroup.key;
                 if (isSameRide) {
                     const sourceIds = new Set(sourceGroup.entries.map(entry => entry.id));
                     coasterLog = coasterLog.filter(entry => !sourceIds.has(entry.id));

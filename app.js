@@ -1294,7 +1294,7 @@
                 return references.get(String(title).toLocaleLowerCase()) || null;
             } catch (error) {
                 console.warn(`Coasterpedia park title lookup failed for "${title}".`, error);
-                return null;
+                throw error;
             }
         }
 
@@ -1316,7 +1316,7 @@
             if (pendingParks.length === 0) return;
 
             let updatedCount = 0;
-            let failedParks = 0;
+            const failedParks = [];
             const workers = Array.from({ length: Math.min(3, pendingParks.length) }, async () => {
                 while (pendingParks.length > 0) {
                     const park = pendingParks.shift();
@@ -1330,6 +1330,12 @@
                     ])]));
                     try {
                         const reference = await resolveCoasterpediaParkReference(park.title, park.pageId);
+                        if (!reference && park.entries.every(entry =>
+                            !entry.coasterpediaRideId && !entry.coasterpediaPageId
+                        )) {
+                            console.info(`Skipping status refresh for "${park.title}": no Coasterpedia park page was found.`);
+                            continue;
+                        }
                         const parkTitle = reference?.title || park.title;
                         const parkPageId = reference?.pageId || park.pageId;
                         park.entries.forEach(entry => {
@@ -1339,7 +1345,11 @@
                         const rides = await fetchCoasterpediaParkRides(parkTitle);
                         await updateLoggedRideStatuses(parkTitle, rides, parkPageId);
                     } catch (error) {
-                        failedParks++;
+                        if (/does not have a coaster list/i.test(error.message || '')) {
+                            console.info(`Skipping status refresh for "${park.title}": Coasterpedia has no coaster list.`);
+                            continue;
+                        }
+                        failedParks.push(park.title);
                         console.error(`Failed to refresh logged ride status for "${park.title}":`, error);
                     } finally {
                         updatedCount += park.entries.filter(entry =>
@@ -1364,8 +1374,11 @@
                 if (!document.getElementById('park-breakdown').classList.contains('hidden')) renderParkBreakdown();
                 showToast(`Updated names or statuses for ${updatedCount} logged coaster${updatedCount === 1 ? '' : 's'} from Coasterpedia.`, 'success');
             }
-            if (failedParks > 0) {
-                showToast(`Could not refresh status from Coasterpedia for ${failedParks} park${failedParks === 1 ? '' : 's'}; saved statuses were kept.`, 'error');
+            if (failedParks.length > 0) {
+                const parkNames = failedParks.slice(0, 3).join(', ');
+                const remainingCount = failedParks.length - 3;
+                const remainingLabel = remainingCount > 0 ? `, and ${remainingCount} more` : '';
+                showToast(`Could not refresh Coasterpedia status for ${parkNames}${remainingLabel}; saved statuses were kept.`, 'error');
             }
         }
 

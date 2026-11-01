@@ -427,7 +427,6 @@
                 <input type="hidden" id="form-coasterpedia-park-page-id">
                 <input type="hidden" id="form-coasterpedia-opening-date">
                 <input type="hidden" id="form-coasterpedia-closing-date">
-                <input type="hidden" id="form-ride-status" value="Unknown">
 
                 <!-- Park Names Row -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -503,6 +502,14 @@
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Ride Count / Laps</label>
                         <input type="number" id="form-ride-count" min="1" value="1" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Ride Status</label>
+                        <select id="form-ride-status" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70">
+                            <option value="Operating" selected>Operating</option>
+                            <option value="Not operating">Not operating</option>
+                            <option value="Defunct">Defunct</option>
+                        </select>
                     </div>
                 </div>
                 <!-- Notes Field -->
@@ -586,6 +593,6 @@
     </div>
 
     <script type="module" src="firebase-cloud.js"></script>
-    <script src="app.js?v=ride-type-select-20261101-21" defer></script>
+    <script src="app.js?v=ride-status-lock-20261101-24" defer></script>
 </body>
 </html>

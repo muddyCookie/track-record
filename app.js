@@ -795,15 +795,18 @@
                     });
                     if (continuation) params.set('cmcontinue', continuation);
 
-                    const response = await fetch(`https://coasterpedia.net/w/api.php?${params}`);
-                    if (!response.ok) {
-                        throw new Error(`Coasterpedia park directory failed with status ${response.status}`);
-                    }
+                    const response = await fetchCoasterpediaApi(params, 'Coasterpedia park directory');
                     const data = await response.json();
-                    parks.push(...(data.query?.categorymembers || []));
+                    if (!Array.isArray(data.query?.categorymembers)) {
+                        throw new Error('Coasterpedia park directory returned an invalid response.');
+                    }
+                    parks.push(...data.query.categorymembers);
                     continuation = data.continue?.cmcontinue || '';
                 } while (continuation);
 
+                if (parks.length === 0) {
+                    throw new Error('Coasterpedia park directory returned no parks.');
+                }
                 coasterpediaParkIndex = parks.sort((a, b) => a.title.localeCompare(b.title));
                 return coasterpediaParkIndex;
             })();
@@ -868,16 +871,16 @@
             });
 
             try {
-                const response = await fetch(`https://coasterpedia.net/w/api.php?${params}`, {
+                const response = await fetchCoasterpediaApi(params, 'Coasterpedia park lookup', {
                     signal: abortController.signal
                 });
-                if (!response.ok) {
-                    throw new Error(`Coasterpedia park lookup failed with status ${response.status}`);
-                }
                 const data = await response.json();
                 if (requestId !== searchRequestId) return;
                 if (parkValidationAbortController === abortController) parkValidationAbortController = null;
 
+                if (!data.query?.pages) {
+                    throw new Error('Coasterpedia park lookup returned an invalid response.');
+                }
                 const pagesByTitle = new Map(Object.values(data.query?.pages || [])
                     .map(page => [page.title.toLocaleLowerCase(), page]));
                 coasterpediaSearchResults.push(...batch.flatMap(park => {
@@ -1087,25 +1090,51 @@
             return rides;
         }
 
-        async function fetchCoasterpediaApi(params, requestLabel) {
+        async function fetchCoasterpediaApi(params, requestLabel, fetchOptions = {}) {
             const url = `https://coasterpedia.net/w/api.php?${params}`;
             const retryableStatuses = new Set([429, 500, 502, 503, 504]);
+            const retryableApiErrors = new Set(['maxlag', 'ratelimited', 'readonly']);
 
             for (let attempt = 0; attempt < 3; attempt++) {
                 let response;
                 try {
-                    response = await fetch(url);
+                    response = await fetch(url, fetchOptions);
                 } catch (error) {
+                    if (fetchOptions.signal?.aborted || error?.name === 'AbortError') throw error;
                     if (attempt === 2) {
-                        throw new Error(`${requestLabel} request failed: ${error.message}`);
+                        throw new Error(`${requestLabel} request failed: ${error?.message || error}`);
                     }
                     await new Promise(resolve => setTimeout(resolve, 500 * (2 ** attempt)));
                     continue;
                 }
 
-                if (response.ok) return response;
-                if (!retryableStatuses.has(response.status) || attempt === 2) {
-                    throw new Error(`${requestLabel} failed with status ${response.status}`);
+                let retryableError = false;
+                let errorDescription = '';
+                if (response.ok) {
+                    let data;
+                    try {
+                        data = await response.clone().json();
+                    } catch (error) {
+                        errorDescription = `returned invalid JSON: ${error?.message || error}`;
+                        retryableError = true;
+                    }
+                    if (data?.error) {
+                        const apiError = data.error;
+                        const errorCode = String(apiError.code || '');
+                        errorDescription = `failed: ${errorCode || 'API error'}: ${apiError.info || 'Unknown MediaWiki API error'}`;
+                        retryableError = retryableApiErrors.has(errorCode) ||
+                            errorCode.startsWith('internal_api_error_');
+                    }
+                    if (!errorDescription) return response;
+                    if (!retryableError || attempt === 2) {
+                        throw new Error(`${requestLabel} ${errorDescription}`);
+                    }
+                } else {
+                    retryableError = retryableStatuses.has(response.status);
+                    errorDescription = `failed with status ${response.status}`;
+                }
+                if (!retryableError || attempt === 2) {
+                    throw new Error(`${requestLabel} ${errorDescription}`);
                 }
 
                 const retryAfter = response.headers.get('Retry-After');
@@ -1920,10 +1949,7 @@
                 format: 'json',
                 origin: '*'
             });
-            const redirectResponse = await fetch(`https://coasterpedia.net/w/api.php?${redirectParams}`);
-            if (!redirectResponse.ok) {
-                throw new Error(`Coasterpedia page redirect lookup failed with status ${redirectResponse.status}`);
-            }
+            const redirectResponse = await fetchCoasterpediaApi(redirectParams, 'Coasterpedia page redirect lookup');
 
             const redirectData = await redirectResponse.json();
             const canonicalTitleByRequestedTitle = new Map();
@@ -1947,10 +1973,7 @@
                     format: 'json',
                     origin: '*'
                 });
-                const articleResponse = await fetch(`https://coasterpedia.net/w/api.php?${articleParams}`);
-                if (!articleResponse.ok) {
-                    throw new Error(`Coasterpedia ride history lookup failed with status ${articleResponse.status}`);
-                }
+                const articleResponse = await fetchCoasterpediaApi(articleParams, 'Coasterpedia ride history lookup');
                 const articleData = await articleResponse.json();
                 Object.values(articleData.query?.pages || []).forEach(page => {
                     const wikitext = page.revisions?.[0]?.slots?.main?.['*'] || '';

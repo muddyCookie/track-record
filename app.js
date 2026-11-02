@@ -854,6 +854,10 @@
             if ((parkSearchLoading && parkSearchLoadingRequestId === requestId) || requestId !== searchRequestId) return;
             parkSearchLoading = true;
             parkSearchLoadingRequestId = requestId;
+            const results = document.getElementById('park-search-results');
+            const scrollTop = results.scrollTop;
+            renderCoasterpediaParkResults();
+            results.scrollTop = scrollTop;
 
             const batchSize = 10;
             const batch = parkSearchCandidates.slice(parkSearchCursor, parkSearchCursor + batchSize);
@@ -904,10 +908,14 @@
             }
 
             parkSearchLoading = false;
+            const resultsScrollTop = results.scrollTop;
             renderCoasterpediaParkResults();
+            results.scrollTop = resultsScrollTop;
 
             const minimumResults = document.getElementById('park-search-input').value.trim() ? 1 : 8;
-            if (coasterpediaSearchResults.length < minimumResults && parkSearchCursor < parkSearchCandidates.length) {
+            const needsMoreResults = results.scrollHeight <= results.clientHeight + 40;
+            if ((coasterpediaSearchResults.length < minimumResults || needsMoreResults) &&
+                parkSearchCursor < parkSearchCandidates.length) {
                 await loadMoreCoasterpediaParks(requestId);
             } else if (coasterpediaSearchResults.length === 0) {
                 renderParkSearchMessage('No parks with roller coaster lists found.');
@@ -970,19 +978,18 @@
 
         function renderCoasterpediaParkResults() {
             const results = document.getElementById('park-search-results');
-            const loadingText = parkSearchCursor < parkSearchCandidates.length
-                ? `Load more parks (${parkSearchCandidates.length.toLocaleString()} names to check)`
-                : `${coasterpediaSearchResults.length} parks with coaster lists`;
+            const loadedCount = coasterpediaSearchResults.length.toLocaleString();
+            const statusMessage = parkSearchLoading
+                ? `${coasterpediaSearchResults.length ? 'Loading more parks' : 'Loading parks'}... · ${loadedCount} found`
+                : parkSearchCursor < parkSearchCandidates.length
+                    ? `Scroll for more · ${loadedCount} found`
+                    : `${loadedCount} parks found`;
             results.innerHTML = coasterpediaSearchResults.map((result, index) => `
                 <button type="button" role="option" aria-selected="false" onclick="selectCoasterpediaPark(${index})" class="w-full text-left px-4 py-3 border-b border-bordercolor last:border-0 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none">
                     <span class="block text-sm font-semibold text-white">${escapeHtml(result.title)}</span>
                     <span class="block text-[11px] text-slate-500 mt-0.5">Park directory</span>
                 </button>
-            `).join('') + (parkSearchLoading
-                ? `<div class="px-4 py-3 text-xs text-slate-400">Checking parks...</div>`
-                : parkSearchCursor < parkSearchCandidates.length
-                    ? `<button type="button" onclick="loadMoreCoasterpediaParks(searchRequestId)" class="w-full px-4 py-3 text-left text-xs text-brand-400 hover:bg-slate-800">${escapeHtml(loadingText)}</button>`
-                    : '');
+            `).join('') + `<div role="status" aria-live="polite" class="border-t border-bordercolor px-4 py-3 text-center text-xs ${parkSearchLoading ? 'text-slate-300' : 'text-slate-500'}">${escapeHtml(statusMessage)}</div>`;
             results.classList.remove('hidden');
             document.getElementById('park-search-input').setAttribute('aria-expanded', 'true');
         }

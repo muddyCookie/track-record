@@ -897,7 +897,9 @@
                 parkSearchLoading = false;
                 console.error('Failed to check Coasterpedia park sections:', err);
                 renderCoasterpediaParkResults();
-                showToast('Failed to check Coasterpedia parks. Try again.', 'error');
+                if (coasterpediaSearchResults.length === 0) {
+                    showToast('Failed to check Coasterpedia parks. Try again.', 'error');
+                }
                 return;
             }
 

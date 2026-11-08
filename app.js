@@ -725,11 +725,11 @@
                         </div>
 
                         <div class="flex flex-wrap items-center justify-end gap-2 self-end md:self-center">
-                            <button onclick="openEditModal('${entry.id}')" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-bordercolor text-xs transition flex items-center gap-1.5" title="Edit Entry" aria-label="Edit ${escapeHtml(entry.coasterName)}">
-                                <i class="fa-solid fa-pen"></i><span>Edit</span>
-                            </button>
                             <button type="button" onclick="relogEntry('${entry.id}')" class="px-3 py-2 rounded-xl bg-brand-600/10 hover:bg-brand-600/20 text-brand-300 border border-brand-500/20 text-xs transition flex items-center gap-1.5" title="Add one lap and update the most recent ridden date/time">
                                 <i class="fa-solid fa-plus"></i><span>Add Lap</span>
+                            </button>
+                            <button onclick="openEditModal('${entry.id}')" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-bordercolor text-xs transition flex items-center gap-1.5" title="Edit Entry" aria-label="Edit ${escapeHtml(entry.coasterName)}">
+                                <i class="fa-solid fa-pen"></i><span>Edit</span>
                             </button>
                             <button type="button" onclick="deleteEntry('${entry.id}')" class="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs transition" title="Delete Entry" aria-label="Delete ${escapeHtml(entry.coasterName)} log entry">
                                 <i class="fa-solid fa-trash"></i>

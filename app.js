@@ -729,7 +729,7 @@
                                 <i class="fa-solid fa-pen"></i><span>Edit</span>
                             </button>
                             <button type="button" onclick="relogEntry('${entry.id}')" class="px-3 py-2 rounded-xl bg-brand-600/10 hover:bg-brand-600/20 text-brand-300 border border-brand-500/20 text-xs transition flex items-center gap-1.5" title="Add one lap and update the most recent ridden date/time">
-                                <i class="fa-solid fa-rotate"></i><span>Relog</span>
+                                <i class="fa-solid fa-plus"></i><span>Add Lap</span>
                             </button>
                             <button type="button" onclick="deleteEntry('${entry.id}')" class="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs transition" title="Delete Entry" aria-label="Delete ${escapeHtml(entry.coasterName)} log entry">
                                 <i class="fa-solid fa-trash"></i>
@@ -2473,7 +2473,7 @@
                             ${loggedEntry
                                 ? `<div class="flex gap-2 self-end sm:self-auto">
                                     ${ride.entityType !== 'Under construction coaster'
-                                        ? `<button data-entry-id="${escapeHtml(loggedEntry.id)}" onclick="relogEntry(this.dataset.entryId)" class="rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-1.5 text-[11px] font-semibold text-brand-300 transition hover:bg-brand-500/20" title="Add one lap and update the most recent ridden date/time"><i class="fa-solid fa-rotate mr-1"></i>Relog</button>`
+                                        ? `<button data-entry-id="${escapeHtml(loggedEntry.id)}" onclick="relogEntry(this.dataset.entryId)" class="rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-1.5 text-[11px] font-semibold text-brand-300 transition hover:bg-brand-500/20" title="Add one lap and update the most recent ridden date/time"><i class="fa-solid fa-plus mr-1"></i>Add Lap</button>`
                                         : ''}
                                     <button data-entry-id="${escapeHtml(loggedEntry.id)}" data-current-name="${escapeHtml(displayedRideName)}" onclick="openRideEntryEdit(this.dataset.entryId, this.dataset.currentName)" class="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[11px] font-semibold text-rose-300 transition hover:bg-rose-500/20"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
                                     <button data-entry-id="${escapeHtml(loggedEntry.id)}" onclick="deleteEntry(this.dataset.entryId)" class="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300 transition hover:bg-rose-500/20" title="Delete log entry" aria-label="Delete ${escapeHtml(displayedRideName)} log entry"><i class="fa-solid fa-trash"></i></button>

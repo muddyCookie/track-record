@@ -432,24 +432,36 @@
                 <!-- Park Names Row -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="block font-semibold text-slate-300 mb-1">Park Name</label>
-                        <input type="text" id="form-park-name" oninput="document.getElementById('form-coasterpedia-park-page-id').value = ''" placeholder="e.g. Kings Island" class="select-none w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70 disabled:select-none">
+                        <div class="mb-1 flex items-center gap-1">
+                            <label class="font-semibold text-slate-300">Park Name</label>
+                            <button type="button" class="text-slate-500 transition hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500" title="Example: Kings Island" aria-label="Example: Kings Island"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
+                        </div>
+                        <input type="text" id="form-park-name" oninput="document.getElementById('form-coasterpedia-park-page-id').value = ''" class="select-none w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70 disabled:select-none">
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-400 mb-1">Park Name When Ridden</label>
-                        <input type="text" id="form-park-ridden" placeholder="e.g. Paramount's Kings Island" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <div class="mb-1 flex items-center gap-1">
+                            <label class="font-semibold text-slate-400">Park Name When Ridden</label>
+                            <button type="button" class="text-slate-500 transition hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500" title="Example: Paramount's Kings Island" aria-label="Example: Paramount's Kings Island"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
+                        </div>
+                        <input type="text" id="form-park-ridden" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                     </div>
                 </div>
 
                 <!-- Coaster Names Row -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="block font-semibold text-slate-300 mb-1">Coaster Name *</label>
-                        <input type="text" id="form-coaster-name" placeholder="e.g. Queen City Stunt Coaster" required class="select-none w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70">
+                        <div class="mb-1 flex items-center gap-1">
+                            <label class="font-semibold text-slate-300">Coaster Name *</label>
+                            <button type="button" class="text-slate-500 transition hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500" title="Example: Queen City Stunt Coaster" aria-label="Example: Queen City Stunt Coaster"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
+                        </div>
+                        <input type="text" id="form-coaster-name" required class="select-none w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70">
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-300 mb-1">Coaster Name When Ridden</label>
-                        <input type="text" id="form-coaster-ridden" placeholder="e.g. Backlot Stunt Coaster" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
+                        <div class="mb-1 flex items-center gap-1">
+                            <label class="font-semibold text-slate-300">Coaster Name When Ridden</label>
+                            <button type="button" class="text-slate-500 transition hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500" title="Example: Backlot Stunt Coaster" aria-label="Example: Backlot Stunt Coaster"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
+                        </div>
+                        <input type="text" id="form-coaster-ridden" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                     </div>
                 </div>
 
@@ -477,8 +489,11 @@
                 <!-- Operated Dates and Variation -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label for="form-manual-operating-dates" class="block font-semibold text-slate-300 mb-1">Operated Dates</label>
-                        <input type="text" id="form-manual-operating-dates" placeholder="e.g. 2007-2020" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70">
+                        <div class="mb-1 flex items-center gap-1">
+                            <label for="form-manual-operating-dates" class="font-semibold text-slate-300">Operated Dates</label>
+                            <button type="button" class="text-slate-500 transition hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500" title="Example: 2007-2020" aria-label="Example: 2007-2020"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
+                        </div>
+                        <input type="text" id="form-manual-operating-dates" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-70">
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-300 mb-1">Variation *</label>
@@ -522,8 +537,11 @@
                         <input type="number" id="form-ride-count" min="1" value="1" class="w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500">
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-300 mb-1">Notes</label>
-                        <textarea id="form-notes" rows="1" placeholder="e.g. Front row night ride!" class="h-[34px] w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 resize-none"></textarea>
+                        <div class="mb-1 flex items-center gap-1">
+                            <label class="font-semibold text-slate-300">Notes</label>
+                            <button type="button" class="text-slate-500 transition hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500" title="Example: Front row night ride!" aria-label="Example: Front row night ride!"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
+                        </div>
+                        <textarea id="form-notes" rows="1" class="h-[34px] w-full bg-slate-900 border border-bordercolor rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-brand-500 resize-none"></textarea>
                     </div>
                 </div>
 

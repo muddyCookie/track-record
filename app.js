@@ -668,10 +668,16 @@
             filtered.forEach(group => {
                 const entry = group.entry;
                 const isDuplicate = duplicateKeys.has(group.key);
-                const openingEntry = group.entries.find(item => item.coasterpediaOpeningDate || item.coasterpediaClosingDate);
-                const manualOperatingDates = group.entries.find(item => item.manualOperatingDates)?.manualOperatingDates;
-                const operatingDates = manualOperatingDates || [openingEntry?.coasterpediaOpeningDate, openingEntry?.coasterpediaClosingDate]
-                    .map(formatCoasterpediaYear)
+                const listedDatesEntry = group.entries.find(item =>
+                    item.coasterpediaDatesListed === true &&
+                    (item.coasterpediaOpeningDate || item.coasterpediaClosingDate)
+                );
+                const listedOpeningDate = formatCoasterpediaYear(listedDatesEntry?.coasterpediaOpeningDate);
+                const listedClosingDate = formatCoasterpediaYear(listedDatesEntry?.coasterpediaClosingDate) ||
+                    (normalizeCoasterStatus(listedDatesEntry?.rideStatus || '') === 'Operating'
+                        ? 'Present'
+                        : '');
+                const operatingDates = [listedOpeningDate, listedClosingDate]
                     .filter(Boolean)
                     .join('–');
 
@@ -707,7 +713,7 @@
                                     ${rideDateTime ? `<span><i class="fa-regular fa-calendar mr-1"></i>First ridden: ${escapeHtml(rideDateTime)}</span>` : ''}
                                     ${group.rideCount > 1 && mostRecentRideDateTime ? `<span><i class="fa-regular fa-clock mr-1"></i>Most recent: ${escapeHtml(mostRecentRideDateTime)}</span>` : ''}
                                     <span class="rounded-md border border-slate-700 px-2 py-0.5 text-[10px] uppercase tracking-wide">${escapeHtml(rideStatus)}</span>
-                                    ${operatingDates ? `<span class="text-slate-500">Dates ${escapeHtml(operatingDates)}</span>` : ''}
+                                    ${operatingDates ? `<span class="text-slate-500">Operated ${escapeHtml(operatingDates)}</span>` : ''}
                                     ${group.rideCount > 1 ? `<span><i class="fa-solid fa-ticket mr-1"></i>${group.rideCount} laps</span>` : ''}
                                 </div>
                                 <div class="flex flex-wrap items-center gap-3">
@@ -1387,6 +1393,14 @@
                 }
 
                 if (identityMatched) {
+                    const sameNameRides = ridesByName.get(normalizeRideStatusName(rideDetails.name)) || [];
+                    const variantDates = coasterpediaOperatingDatesForVariant(rideDetails, entry.variant);
+                    const datesAreListed = sameNameRides.length > 1 &&
+                        Boolean(variantDates.openingDate || variantDates.closingDate);
+                    if (entry.coasterpediaDatesListed !== datesAreListed) {
+                        entry.coasterpediaDatesListed = datesAreListed;
+                        changed = true;
+                    }
                     if (rideDetails.changeYear) {
                         const operatingDates = coasterpediaOperatingDatesForVariant(rideDetails, entry.variant);
                         if (entry.coasterpediaOpeningDate !== operatingDates.openingDate) {
@@ -2430,12 +2444,15 @@
                     const rideStatus = coasterStatusForRide(ride);
                     const operatingDates = coasterpediaOperatingDatesForVariant(ride, displayedVariant);
                     const disambiguatingOpeningDate = sameNameRideCount > 1 ? operatingDates.openingDate : '';
-                    const disambiguatingClosingDate = sameNameRideCount > 1 ? operatingDates.closingDate : '';
+                    const disambiguatingClosingDate = sameNameRideCount > 1
+                        ? operatingDates.closingDate ||
+                            (operatingDates.openingDate && ride.entityType === 'Operating coaster' ? 'Present' : '')
+                        : '';
                     const rideOpeningDate = operatingDates.openingDate;
                     const rideClosingDate = operatingDates.closingDate;
                     const disambiguatingDateLabel = [disambiguatingOpeningDate, disambiguatingClosingDate].filter(Boolean).join('–');
                     const dateLabel = disambiguatingDateLabel
-                        ? `<p class="mt-1 text-[11px] text-slate-500">Dates ${escapeHtml(disambiguatingDateLabel)}</p>`
+                        ? `<p class="mt-1 text-[11px] text-slate-500">Operated ${escapeHtml(disambiguatingDateLabel)}</p>`
                         : '';
 
                     rideRows += `
@@ -2464,7 +2481,7 @@
                                 : ride.entityType === 'Under construction coaster'
                                     ? `<span class="self-end text-[11px] text-slate-500 sm:self-auto">Logging unavailable while under construction</span>`
                                     : `<div class="flex flex-wrap gap-2 self-end sm:self-auto">
-                                    <button data-park-name="${escapeHtml(ride.parkName)}" data-ride-name="${escapeHtml(displayedRideName)}" data-ride-type="${ride.type || 'Real'}" data-variant="${variant}" data-status="${rideStatus}" data-ride-id="${escapeHtml(rideSourceId)}" data-opening-date="${escapeHtml(rideOpeningDate)}" data-closing-date="${escapeHtml(rideClosingDate)}" onclick="quickLogRide(this.dataset.parkName, this.dataset.rideName, this.dataset.variant, this.dataset.rideType, this.dataset.status, this.dataset.rideId, this.dataset.openingDate, this.dataset.closingDate)" class="rounded-lg bg-brand-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-brand-500"><i class="fa-solid fa-plus mr-1"></i>Log Coaster</button>
+                                    <button data-park-name="${escapeHtml(ride.parkName)}" data-ride-name="${escapeHtml(displayedRideName)}" data-ride-type="${ride.type || 'Real'}" data-variant="${variant}" data-status="${rideStatus}" data-ride-id="${escapeHtml(rideSourceId)}" data-opening-date="${escapeHtml(rideOpeningDate)}" data-closing-date="${escapeHtml(rideClosingDate)}" data-dates-listed="${Boolean(disambiguatingDateLabel)}" onclick="quickLogRide(this.dataset.parkName, this.dataset.rideName, this.dataset.variant, this.dataset.rideType, this.dataset.status, this.dataset.rideId, this.dataset.openingDate, this.dataset.closingDate, this.dataset.datesListed)" class="rounded-lg bg-brand-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-brand-500"><i class="fa-solid fa-plus mr-1"></i>Log Coaster</button>
                                 </div>`}
                         </div>
                     `;
@@ -2522,7 +2539,7 @@
         }
 
         // Quick Log from Coasterpedia's park directory
-        function quickLogRide(parkName, rideName, variant = 'Original', type = 'Real', status = 'Operating', rideId = '', openingDate = '', closingDate = '') {
+        function quickLogRide(parkName, rideName, variant = 'Original', type = 'Real', status = 'Operating', rideId = '', openingDate = '', closingDate = '', datesListed = 'false') {
             const ride = currentParkRides.find(item =>
                 (item.sourceRideId || item.id) === rideId
             );
@@ -2548,6 +2565,7 @@
             );
             document.getElementById('form-coasterpedia-opening-date').value = operatingDates.openingDate;
             document.getElementById('form-coasterpedia-closing-date').value = operatingDates.closingDate;
+            document.getElementById('form-coasterpedia-dates-listed').value = datesListed === 'true' ? 'true' : 'false';
             document.getElementById('form-coasterpedia-change-year').value = ride?.changeYear || '';
             setOperatingDatesField('', operatingDates.openingDate, operatingDates.closingDate);
             document.getElementById('form-coasterpedia-page-id').value = ride?.coasterpediaPageId || '';
@@ -2609,6 +2627,7 @@
             document.getElementById('form-coasterpedia-park-page-id').value = '';
             document.getElementById('form-coasterpedia-opening-date').value = '';
             document.getElementById('form-coasterpedia-closing-date').value = '';
+            document.getElementById('form-coasterpedia-dates-listed').value = 'false';
             document.getElementById('form-coasterpedia-change-year').value = '';
             document.getElementById('form-manual-operating-dates').value = '';
             document.getElementById('form-manual-operating-dates').disabled = false;
@@ -2664,6 +2683,8 @@
                 }, entry.variant);
             document.getElementById('form-coasterpedia-opening-date').value = operatingDates.openingDate;
             document.getElementById('form-coasterpedia-closing-date').value = operatingDates.closingDate;
+            document.getElementById('form-coasterpedia-dates-listed').value =
+                entry.coasterpediaDatesListed === true ? 'true' : 'false';
             document.getElementById('form-coasterpedia-change-year').value =
                 matchingRide?.changeYear || entry.coasterpediaChangeYear || '';
             setOperatingDatesField(entry.manualOperatingDates || '', operatingDates.openingDate, operatingDates.closingDate);
@@ -2782,6 +2803,23 @@
             if (coasterNameInput.value !== currentCoasterName) {
                 coasterNameInput.value = currentCoasterName;
             }
+            const entry = coasterLog.find(item => item.id === id);
+            const matchingRide = currentParkRides.find(ride =>
+                (entry?.coasterpediaRideId && (ride.sourceRideId || ride.id) === entry.coasterpediaRideId) ||
+                (!entry?.coasterpediaRideId && ride.name.toLocaleLowerCase() === currentCoasterName.toLocaleLowerCase())
+            );
+            const sameNameRideCount = matchingRide
+                ? new Set(currentParkRides
+                    .filter(ride => ride.name.toLocaleLowerCase() === matchingRide.name.toLocaleLowerCase())
+                    .map(ride => ride.sourceRideId || ride.id)).size
+                : 1;
+            const operatingDates = matchingRide
+                ? coasterpediaOperatingDatesForVariant(matchingRide, entry.variant)
+                : null;
+            document.getElementById('form-coasterpedia-dates-listed').value =
+                sameNameRideCount > 1 && (operatingDates?.openingDate || operatingDates?.closingDate)
+                    ? 'true'
+                    : 'false';
         }
 
         function closeEntryModal() {
@@ -2826,6 +2864,8 @@
             const coasterpediaParkPageId = document.getElementById('form-coasterpedia-park-page-id').value;
             const coasterpediaOpeningDate = document.getElementById('form-coasterpedia-opening-date').value;
             const coasterpediaClosingDate = document.getElementById('form-coasterpedia-closing-date').value;
+            const coasterpediaDatesListed =
+                document.getElementById('form-coasterpedia-dates-listed').value === 'true';
             const coasterpediaChangeYear = document.getElementById('form-coasterpedia-change-year').value;
             const operatingDatesInput = document.getElementById('form-manual-operating-dates');
             const manualOperatingDates = operatingDatesInput.disabled
@@ -2854,6 +2894,7 @@
                         coasterpediaParkPageId,
                         coasterpediaOpeningDate,
                         coasterpediaClosingDate,
+                        coasterpediaDatesListed,
                         coasterpediaChangeYear,
                         manualOperatingDates,
                         type,
@@ -2886,6 +2927,7 @@
                     coasterpediaParkPageId,
                     coasterpediaOpeningDate,
                     coasterpediaClosingDate,
+                    coasterpediaDatesListed,
                     coasterpediaChangeYear,
                     manualOperatingDates,
                     type,
